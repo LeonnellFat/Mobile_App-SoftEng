@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'dart:math';
 import 'package:provider/provider.dart';
 import '../config/theme.dart';
 import '../providers/cart_provider.dart';
@@ -10,11 +12,13 @@ import '../models/cart_item.dart';
 class CheckoutDialog extends StatefulWidget {
   final double total;
   final String deliveryOption;
+  final List<dynamic>? selectedItems;
 
   const CheckoutDialog({
     super.key,
     required this.total,
     required this.deliveryOption,
+    this.selectedItems,
   });
 
   @override
@@ -26,12 +30,10 @@ class _CheckoutDialogState extends State<CheckoutDialog> {
   String _pickupTime = '';
 
   final _addressFormKey = GlobalKey<FormState>();
-  final _paymentFormKey = GlobalKey<FormState>();
 
   final _nameController = TextEditingController();
   final _streetController = TextEditingController();
   final _cityController = TextEditingController();
-  final _stateController = TextEditingController();
   final _zipController = TextEditingController();
   final _phoneController = TextEditingController();
   final _instructionsController = TextEditingController();
@@ -46,7 +48,6 @@ class _CheckoutDialogState extends State<CheckoutDialog> {
     _nameController.dispose();
     _streetController.dispose();
     _cityController.dispose();
-    _stateController.dispose();
     _zipController.dispose();
     _phoneController.dispose();
     _instructionsController.dispose();
@@ -59,30 +60,51 @@ class _CheckoutDialogState extends State<CheckoutDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
+    final isSmallScreen = screenWidth < 500;
+
+    final dialogWidth = isSmallScreen
+        ? screenWidth * 0.9
+        : min(screenWidth * 0.8, 500.0);
+    final dialogHeight = screenHeight * 0.85;
+
     return Dialog(
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppTheme.radiusLg),
       ),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 8),
       child: Container(
-        constraints: const BoxConstraints(maxWidth: 500, maxHeight: 600),
+        width: dialogWidth,
+        height: dialogHeight,
+        constraints: BoxConstraints(
+          maxWidth: dialogWidth,
+          maxHeight: dialogHeight,
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             // Header
             Padding(
-              padding: const EdgeInsets.all(24),
+              padding: EdgeInsets.all(isSmallScreen ? 16 : 24),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    _currentStep == 0
-                        ? 'Delivery Information'
-                        : _currentStep == 1
-                        ? 'Payment Information'
-                        : 'Order Confirmed',
-                    style: Theme.of(
-                      context,
-                    ).textTheme.titleLarge?.copyWith(color: AppTheme.primary),
+                  Expanded(
+                    child: Text(
+                      _currentStep == 0
+                          ? (widget.deliveryOption == 'pickup'
+                                ? 'Order Store Pickup'
+                                : 'Delivery Information')
+                          : _currentStep == 1
+                          ? 'Confirm Order'
+                          : 'Order Confirmed',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        color: AppTheme.primary,
+                        fontSize: isSmallScreen ? 18 : 20,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                   IconButton(
                     icon: const Icon(Icons.close),
@@ -112,9 +134,10 @@ class _CheckoutDialogState extends State<CheckoutDialog> {
 
   Widget _buildAddressStep() {
     if (widget.deliveryOption == 'pickup') {
-      return Padding(
+      return SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
             const Icon(Icons.store, size: 64, color: AppTheme.primary),
             const SizedBox(height: 24),
@@ -134,8 +157,8 @@ class _CheckoutDialogState extends State<CheckoutDialog> {
                     style: TextStyle(fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 8),
-                  const Text('123 Garden Street'),
-                  const Text('Flower City, FC 12345'),
+                  const Text('Dr Miciano Rd'),
+                  const Text('Dumaguete City'),
                   const SizedBox(height: 12),
                   const Text(
                     'Store Hours:',
@@ -143,11 +166,30 @@ class _CheckoutDialogState extends State<CheckoutDialog> {
                   ),
                   const Text('Mon-Fri: 8:00 AM - 8:00 PM'),
                   const Text('Sat-Sun: 9:00 AM - 7:00 PM'),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.phone,
+                        size: 16,
+                        color: AppTheme.primary,
+                      ),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'Call us: 0936 047 9432',
+                        style: TextStyle(
+                          color: AppTheme.primary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
             const SizedBox(height: 24),
             DropdownButtonFormField<String>(
+              isExpanded: true,
               decoration: const InputDecoration(
                 labelText: 'Preferred Pickup Time *',
               ),
@@ -162,6 +204,14 @@ class _CheckoutDialogState extends State<CheckoutDialog> {
                   value: 'Tomorrow morning (9-12 PM)',
                   child: Text('Tomorrow morning (9-12 PM)'),
                 ),
+                DropdownMenuItem(
+                  value: 'Tomorrow afternoon (12-5 PM)',
+                  child: Text('Tomorrow afternoon (12-5 PM)'),
+                ),
+                DropdownMenuItem(
+                  value: 'Tomorrow evening (5-8 PM)',
+                  child: Text('Tomorrow evening (5-8 PM)'),
+                ),
               ],
               initialValue: _pickupTime.isEmpty ? null : _pickupTime,
               onChanged: (value) {
@@ -170,7 +220,48 @@ class _CheckoutDialogState extends State<CheckoutDialog> {
                 });
               },
             ),
-            const Spacer(),
+            const SizedBox(height: 24),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.amber[50],
+                borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+                border: Border.all(color: Colors.amber[200]!),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.info_outline,
+                        color: Colors.amber[800],
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Pickup Instructions:',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            color: Colors.amber[900],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '• Please bring a valid ID for order verification\n'
+                    '• We\'ll send you a text when your order is ready\n'
+                    '• Orders not picked up within 24 hours may be cancelled\n'
+                    '• Free parking available in front of the store',
+                    style: TextStyle(fontSize: 12, color: Colors.amber[900]),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
@@ -217,39 +308,29 @@ class _CheckoutDialogState extends State<CheckoutDialog> {
               },
             ),
             const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: TextFormField(
-                    controller: _cityController,
-                    decoration: const InputDecoration(labelText: 'City *'),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Required';
-                      }
-                      return null;
-                    },
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: TextFormField(
-                    controller: _stateController,
-                    decoration: const InputDecoration(labelText: 'State'),
-                  ),
-                ),
-              ],
+            TextFormField(
+              controller: _cityController,
+              decoration: const InputDecoration(labelText: 'City *'),
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return 'Required';
+                }
+                return null;
+              },
             ),
             const SizedBox(height: 16),
             TextFormField(
               controller: _zipController,
               decoration: const InputDecoration(labelText: 'ZIP Code'),
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
             ),
             const SizedBox(height: 16),
             TextFormField(
               controller: _phoneController,
               decoration: const InputDecoration(labelText: 'Phone Number *'),
-              keyboardType: TextInputType.phone,
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
               validator: (value) {
                 if (value == null || value.isEmpty) {
                   return 'Please enter your phone number';
@@ -289,130 +370,185 @@ class _CheckoutDialogState extends State<CheckoutDialog> {
   Widget _buildPaymentStep() {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
-      child: Form(
-        key: _paymentFormKey,
-        child: Column(
-          children: [
-            TextFormField(
-              controller: _cardNumberController,
-              decoration: const InputDecoration(
-                labelText: 'Card Number *',
-                hintText: '1234 5678 9012 3456',
-              ),
-              keyboardType: TextInputType.number,
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Please enter card number';
-                }
-                return null;
-              },
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Payment Method
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFE8F5E9),
+              borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+              border: Border.all(color: const Color(0xFF4CAF50)),
             ),
-            const SizedBox(height: 16),
-            Row(
+            child: Row(
               children: [
+                const Icon(Icons.wallet, color: Color(0xFF4CAF50), size: 24),
+                const SizedBox(width: 12),
                 Expanded(
-                  child: TextFormField(
-                    controller: _expiryController,
-                    decoration: const InputDecoration(
-                      labelText: 'Expiry Date *',
-                      hintText: 'MM/YY',
-                    ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Required';
-                      }
-                      return null;
-                    },
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: TextFormField(
-                    controller: _cvvController,
-                    decoration: const InputDecoration(
-                      labelText: 'CVV *',
-                      hintText: '123',
-                    ),
-                    keyboardType: TextInputType.number,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Required';
-                      }
-                      return null;
-                    },
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: const [
+                      Text(
+                        'Cash Payment',
+                        style: TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      SizedBox(height: 4),
+                      Text(
+                        'Pay when you receive your order',
+                        style: TextStyle(fontSize: 12, color: Colors.grey),
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _cardNameController,
-              decoration: const InputDecoration(labelText: 'Name on Card *'),
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Please enter name on card';
-                }
-                return null;
-              },
+          ),
+
+          const SizedBox(height: 24),
+
+          // Order Summary
+          Text(
+            'Order Summary',
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+          ),
+
+          const SizedBox(height: 16),
+
+          // Different summary based on delivery option
+          if (widget.deliveryOption == 'pickup') ...[
+            _buildOrderSummaryRow('Pickup Time:', _pickupTime),
+            const SizedBox(height: 8),
+            _buildOrderSummaryRow('Location:', "Jean's Flower Shop"),
+            const SizedBox(height: 8),
+            _buildOrderSummaryRow('Address:', 'Dr Miciano Rd, Dumaguete City'),
+          ] else ...[
+            _buildOrderSummaryRow('Delivery to:', _nameController.text),
+            const SizedBox(height: 8),
+            _buildOrderSummaryRow(
+              'Address:',
+              '${_streetController.text}, ${_cityController.text}',
             ),
-            const SizedBox(height: 24),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade50,
-                borderRadius: BorderRadius.circular(AppTheme.radiusLg),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('Total Amount:'),
-                  Text(
-                    '₱${widget.total.toStringAsFixed(2)}',
-                    style: const TextStyle(
-                      color: AppTheme.primary,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-            Row(
-              children: [
-                Expanded(
-                  child: TextButton(
-                    onPressed: () {
-                      setState(() {
-                        _currentStep = 0;
-                      });
-                    },
-                    child: const Text('Back'),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () {
-                      if (_paymentFormKey.currentState!.validate()) {
-                        _processOrder();
-                      }
-                    },
-                    child: const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.credit_card, size: 18),
-                        SizedBox(width: 8),
-                        Text('Place Order'),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
+            const SizedBox(height: 8),
+            _buildOrderSummaryRow('Phone:', _phoneController.text),
           ],
-        ),
+
+          const Divider(height: 24),
+
+          // Total
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Total Amount:',
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
+              ),
+              Text(
+                '₱${widget.total.toStringAsFixed(2)}',
+                style: const TextStyle(
+                  color: AppTheme.primary,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 16),
+
+          // Payment Instructions
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.amber[50],
+              borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+              border: Border.all(color: Colors.amber[200]!),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.info_outline,
+                      color: Colors.amber[800],
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Payment Instructions:',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: Colors.amber[900],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  widget.deliveryOption == 'pickup'
+                      ? '• Please prepare exact change if possible\n'
+                            '• Payment will be collected upon pickup\n'
+                            '• Cash only - no credit/debit cards accepted'
+                      : '• Please prepare exact change if possible\n'
+                            '• Payment will be collected upon delivery\n'
+                            '• Cash only - no credit/debit cards accepted',
+                  style: TextStyle(fontSize: 12, color: Colors.amber[900]),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 24),
+
+          // Action Buttons
+          Row(
+            children: [
+              Expanded(
+                child: TextButton(
+                  onPressed: () {
+                    setState(() {
+                      _currentStep = 0;
+                    });
+                  },
+                  child: const Text('Back'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    _processOrder();
+                  },
+                  icon: const Icon(Icons.check_circle, size: 18),
+                  label: const Text('Place Order'),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
+    );
+  }
+
+  Widget _buildOrderSummaryRow(String label, String value) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label, style: const TextStyle(color: Colors.grey, fontSize: 14)),
+        Expanded(
+          child: Text(
+            value,
+            textAlign: TextAlign.right,
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
     );
   }
 
@@ -482,11 +618,14 @@ class _CheckoutDialogState extends State<CheckoutDialog> {
         ? _nameController.text
         : user.name;
     final customerAddress = widget.deliveryOption == 'delivery'
-        ? '${_streetController.text}, ${_cityController.text}, ${_stateController.text} ${_zipController.text}'
+        ? '${_streetController.text}, ${_cityController.text}'
         : 'Store Pickup';
     final customerPhone = widget.deliveryOption == 'delivery'
         ? _phoneController.text
         : user.phone;
+
+    // Use selected items if provided, otherwise use all items
+    final itemsToOrder = widget.selectedItems ?? cartProvider.cartItems;
 
     final order = Order(
       id: 'ORD-${DateTime.now().millisecondsSinceEpoch}',
@@ -494,7 +633,7 @@ class _CheckoutDialogState extends State<CheckoutDialog> {
       customerEmail: user.email,
       customerPhone: customerPhone,
       customerAddress: customerAddress,
-      items: cartProvider.cartItems
+      items: itemsToOrder
           .map(
             (item) => CartItem(product: item.product, quantity: item.quantity),
           )
@@ -515,9 +654,17 @@ class _CheckoutDialogState extends State<CheckoutDialog> {
     );
 
     adminProvider.addOrder(order);
-    cartProvider.clearCart();
 
-    // Save empty cart to database for this user
+    // Only remove selected items from cart
+    if (widget.selectedItems != null) {
+      for (var item in widget.selectedItems!) {
+        cartProvider.removeFromCart(item.product.id);
+      }
+    } else {
+      cartProvider.clearCart();
+    }
+
+    // Save cart to database for this user
     if (user.email.isNotEmpty) {
       cartProvider.saveCartToDatabase(user.email);
     }

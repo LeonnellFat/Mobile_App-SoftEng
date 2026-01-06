@@ -25,9 +25,27 @@ class _DriverScreenState extends State<DriverScreen> {
     final adminProvider = context.watch<AdminProvider>();
     final authProvider = context.watch<AuthProvider>();
 
-    // Filter orders
+    // Get current driver's ID
+    final driverId = authProvider.user?.id ?? '';
+    debugPrint('🚗 Current Driver ID: $driverId');
+    debugPrint('📦 Total Orders in System: ${adminProvider.orders.length}');
+
+    // Filter orders assigned to this driver only
+    final assignedOrders = adminProvider.orders
+        .where((order) => order.driverId == driverId)
+        .toList();
+    debugPrint('✅ Orders Assigned to This Driver: ${assignedOrders.length}');
+
+    // Debug: Show details of all assigned orders
+    for (var order in assignedOrders) {
+      debugPrint(
+        '📦 Order ${order.id}: Status=${order.status.name}, DeliveryType=${order.deliveryType.name}',
+      );
+    }
+
+    // Filter orders by status
     final readyOrders =
-        adminProvider.orders
+        assignedOrders
             .where(
               (order) =>
                   order.deliveryType == DeliveryType.delivery &&
@@ -41,7 +59,7 @@ class _DriverScreenState extends State<DriverScreen> {
           );
 
     final outForDeliveryOrders =
-        adminProvider.orders
+        assignedOrders
             .where(
               (order) =>
                   order.deliveryType == DeliveryType.delivery &&
@@ -54,7 +72,7 @@ class _DriverScreenState extends State<DriverScreen> {
             ).compareTo(DateTime.parse(b.orderDate)),
           );
 
-    final completedOrders = adminProvider.orders
+    final completedOrders = assignedOrders
         .where(
           (order) =>
               order.deliveryType == DeliveryType.delivery &&
@@ -405,18 +423,25 @@ class _DriverScreenState extends State<DriverScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        children: [
-                          Text(
-                            'Order ${order.id}',
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Flexible(
+                              child: Text(
+                                order.orderNumber ?? 'Order ${order.id}',
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 8),
-                          _buildSmallStatusBadge(order.status),
-                        ],
+                            const SizedBox(width: 8),
+                            _buildSmallStatusBadge(order.status),
+                          ],
+                        ),
                       ),
                       const SizedBox(height: 4),
                       Text(
@@ -515,12 +540,14 @@ class _DriverScreenState extends State<DriverScreen> {
 
             const SizedBox(height: 12),
 
-            // Action Buttons
-            Row(
-              children: [
-                if (order.status == OrderStatus.ready)
-                  Expanded(
-                    child: ElevatedButton.icon(
+            // Action Buttons - Enhanced Workflow (Responsive)
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (order.status == OrderStatus.ready)
+                    ElevatedButton.icon(
                       onPressed: () {
                         adminProvider.updateOrderStatus(
                           order.id,
@@ -528,22 +555,21 @@ class _DriverScreenState extends State<DriverScreen> {
                         );
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                            content: Text('Order marked as Out for Delivery'),
-                            backgroundColor: AppTheme.primary,
+                            content: Text('✅ Enroute! Order status updated'),
+                            backgroundColor: Colors.purple,
+                            duration: Duration(seconds: 2),
                           ),
                         );
                       },
-                      icon: const Icon(Icons.local_shipping, size: 18),
-                      label: const Text('Start Delivery'),
+                      icon: const Icon(Icons.directions_car, size: 18),
+                      label: const Text('Enroute/Pickup'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.purple,
                         foregroundColor: Colors.white,
                       ),
                     ),
-                  ),
-                if (order.status == OrderStatus.outForDelivery)
-                  Expanded(
-                    child: ElevatedButton.icon(
+                  if (order.status == OrderStatus.outForDelivery)
+                    ElevatedButton.icon(
                       onPressed: () {
                         adminProvider.updateOrderStatus(
                           order.id,
@@ -551,29 +577,32 @@ class _DriverScreenState extends State<DriverScreen> {
                         );
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                            content: Text('Order marked as Delivered'),
+                            content: Text(
+                              '✅ Order marked as Completed/Delivered',
+                            ),
                             backgroundColor: Colors.green,
+                            duration: Duration(seconds: 2),
                           ),
                         );
                       },
                       icon: const Icon(Icons.check_circle, size: 18),
-                      label: const Text('Mark Delivered'),
+                      label: const Text('Mark as Completed/Delivered'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.green,
                         foregroundColor: Colors.white,
                       ),
                     ),
+                  const SizedBox(width: 8),
+                  OutlinedButton.icon(
+                    onPressed: () => _makePhoneCall(order.customerPhone),
+                    icon: const Icon(Icons.phone, size: 18),
+                    label: const Text('Call'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppTheme.primary,
+                    ),
                   ),
-                const SizedBox(width: 8),
-                OutlinedButton.icon(
-                  onPressed: () => _makePhoneCall(order.customerPhone),
-                  icon: const Icon(Icons.phone, size: 18),
-                  label: const Text('Call'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppTheme.primary,
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
           ],
         ),

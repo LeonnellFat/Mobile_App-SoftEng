@@ -305,7 +305,7 @@ class SupabaseService {
       final data = await _client
           .from('orders')
           .select(
-            '*, profiles!orders_user_id_fkey(full_name, email, phone, address)',
+            '*, order_number, driver_id, profiles!orders_user_id_fkey(full_name, email, phone, address)',
           )
           .order('created_at', ascending: false);
 
@@ -323,6 +323,7 @@ class SupabaseService {
         ordersList.map((o) async {
           try {
             debugPrint('Parsing order: $o');
+            debugPrint('Order number from DB: ${o['order_number']}');
 
             // If there's a profiles object, merge it into the order data
             if (o['profiles'] != null) {
@@ -362,6 +363,9 @@ class SupabaseService {
             }
 
             final order = Order.fromJson(o);
+            debugPrint(
+              '✅ Parsed Order ID: ${order.id}, OrderNumber: ${order.orderNumber}, Driver ID: ${order.driverId}, Status: ${order.status}',
+            );
             return order;
           } catch (e) {
             debugPrint('Error parsing individual order: $e');

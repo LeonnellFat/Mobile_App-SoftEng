@@ -14,6 +14,7 @@ enum DeliveryType { delivery, pickup }
 
 class Order {
   final String id;
+  final String? orderNumber;
   final String customerName;
   final String customerEmail;
   final String customerPhone;
@@ -26,9 +27,11 @@ class Order {
   final String? notes;
   final DeliveryType deliveryType;
   final String? pickupTime;
+  final String? driverId;
 
   Order({
     required this.id,
+    this.orderNumber,
     required this.customerName,
     required this.customerEmail,
     required this.customerPhone,
@@ -41,11 +44,14 @@ class Order {
     this.notes,
     this.deliveryType = DeliveryType.delivery,
     this.pickupTime,
+    this.driverId,
   });
 
   factory Order.fromJson(Map<String, dynamic> json) {
     return Order(
       id: json['id'] as String,
+      orderNumber:
+          json['order_number'] as String? ?? json['orderNumber'] as String?,
       customerName:
           json['customer_name'] as String? ??
           json['customerName'] as String? ??
@@ -87,12 +93,14 @@ class Order {
       ),
       pickupTime:
           json['pickup_time'] as String? ?? json['pickupTime'] as String?,
+      driverId: json['driver_id'] as String? ?? json['driverId'] as String?,
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
       'id': id,
+      'order_number': orderNumber,
       'customerName': customerName,
       'customerEmail': customerEmail,
       'customerPhone': customerPhone,
@@ -105,11 +113,13 @@ class Order {
       'notes': notes,
       'deliveryType': deliveryType.name,
       'pickupTime': pickupTime,
+      'driverId': driverId,
     };
   }
 
   Order copyWith({
     String? id,
+    String? orderNumber,
     String? customerName,
     String? customerEmail,
     String? customerPhone,
@@ -122,9 +132,11 @@ class Order {
     String? notes,
     DeliveryType? deliveryType,
     String? pickupTime,
+    String? driverId,
   }) {
     return Order(
       id: id ?? this.id,
+      orderNumber: orderNumber ?? this.orderNumber,
       customerName: customerName ?? this.customerName,
       customerEmail: customerEmail ?? this.customerEmail,
       customerPhone: customerPhone ?? this.customerPhone,
@@ -137,6 +149,7 @@ class Order {
       notes: notes ?? this.notes,
       deliveryType: deliveryType ?? this.deliveryType,
       pickupTime: pickupTime ?? this.pickupTime,
+      driverId: driverId ?? this.driverId,
     );
   }
 }

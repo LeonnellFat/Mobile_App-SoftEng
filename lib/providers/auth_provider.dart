@@ -158,8 +158,28 @@ class AuthProvider extends ChangeNotifier {
       if (password.isEmpty) {
         return 'Please enter a password';
       }
+
+      // Fetch admin ID from Supabase profiles
+      String adminId = '';
+      try {
+        final profileResponse = await supabase.Supabase.instance.client
+            .from('profiles')
+            .select('id')
+            .eq('email', email)
+            .maybeSingle();
+
+        if (profileResponse != null) {
+          adminId = profileResponse['id'] as String? ?? '';
+          debugPrint(
+            '✅ Admin fetched from profiles: ID=$adminId, Email=$email',
+          );
+        }
+      } catch (e) {
+        debugPrint('⚠️ Failed to fetch admin profile: $e');
+      }
+
       _user = User(
-        id: '',
+        id: adminId,
         name: 'Admin',
         email: AppConstants.adminEmail,
         phone: '',
@@ -178,10 +198,30 @@ class AuthProvider extends ChangeNotifier {
       if (password.isEmpty) {
         return 'Please enter a password';
       }
+
+      // Fetch driver ID from Supabase profiles
+      String driverId = '';
+      try {
+        final profileResponse = await supabase.Supabase.instance.client
+            .from('profiles')
+            .select('id')
+            .eq('email', email)
+            .maybeSingle();
+
+        if (profileResponse != null) {
+          driverId = profileResponse['id'] as String? ?? '';
+          debugPrint(
+            '✅ Driver fetched from profiles: ID=$driverId, Email=$email',
+          );
+        }
+      } catch (e) {
+        debugPrint('⚠️ Failed to fetch driver profile: $e');
+      }
+
       _user = User(
-        id: '',
+        id: driverId,
         name: 'Driver',
-        email: AppConstants.driverEmail,
+        email: email,
         phone: '',
         address: '',
         orders: 0,

@@ -33,8 +33,8 @@ class _CartScreenState extends State<CartScreen> {
       return _buildEmptyCart();
     }
 
-    final subtotal = cartProvider.getSubtotal();
-    final deliveryFee = _deliveryOption == 'delivery' ? 5.99 : 0.0;
+    final subtotal = cartProvider.getSelectedSubtotal();
+    final deliveryFee = _deliveryOption == 'delivery' ? 60.0 : 0.0;
     final tax = subtotal * 0.08;
     final total = subtotal + deliveryFee + tax;
 
@@ -61,15 +61,53 @@ class _CartScreenState extends State<CartScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'Shopping Cart',
-                        style: Theme.of(context).textTheme.headlineMedium
-                            ?.copyWith(color: AppTheme.primary),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Shopping Cart',
+                            style: Theme.of(context).textTheme.headlineMedium
+                                ?.copyWith(color: AppTheme.primary),
+                          ),
+                          Chip(
+                            label: Text(
+                              '${cartProvider.getSelectedItemCount()}/${cartItems.length}',
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            backgroundColor: AppTheme.primary.withAlpha(30),
+                            labelStyle: const TextStyle(
+                              color: AppTheme.primary,
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '${cartItems.length} items in your cart',
-                        style: Theme.of(context).textTheme.bodySmall,
+                      const SizedBox(height: 12),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            '${cartItems.length} items in your cart',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                          TextButton.icon(
+                            onPressed: () {
+                              if (cartProvider.areAllItemsSelected()) {
+                                cartProvider.deselectAllItems();
+                              } else {
+                                cartProvider.selectAllItems();
+                              }
+                            },
+                            icon: cartProvider.areAllItemsSelected()
+                                ? const Icon(Icons.check_circle)
+                                : const Icon(Icons.circle_outlined),
+                            label: cartProvider.areAllItemsSelected()
+                                ? const Text('Deselect All')
+                                : const Text('Select All'),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -130,42 +168,79 @@ class _CartScreenState extends State<CartScreen> {
             padding: EdgeInsets.all(
               ResponsiveHelper.getResponsiveHorizontalPadding(context),
             ),
-            child: ElevatedButton(
-              onPressed: () {
-                if (!authProvider.isLoggedIn) {
-                  authProvider.setShowGuestModal(true);
-                  return;
-                }
-
-                showDialog(
-                  context: context,
-                  builder: (context) => CheckoutDialog(
-                    total: total,
-                    deliveryOption: _deliveryOption,
-                  ),
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 20),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.credit_card),
-                  const SizedBox(width: 12),
-                  Text(
-                    'Proceed to Checkout',
-                    style: TextStyle(
-                      fontSize: ResponsiveHelper.getResponsiveFontSize(
-                        context,
-                        16,
-                        maxSize: 18,
-                      ),
-                      fontWeight: FontWeight.w600,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (cartProvider.getSelectedItemCount() == 0)
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    margin: const EdgeInsets.only(bottom: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.amber[50],
+                      border: Border.all(color: Colors.amber[200]!),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.info_outline,
+                          color: Colors.amber,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Select at least one item to proceed',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.amber[900],
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ],
-              ),
+                ElevatedButton(
+                  onPressed: cartProvider.getSelectedItemCount() == 0
+                      ? null
+                      : () {
+                          if (!authProvider.isLoggedIn) {
+                            authProvider.setShowGuestModal(true);
+                            return;
+                          }
+
+                          showDialog(
+                            context: context,
+                            builder: (context) => CheckoutDialog(
+                              total: total,
+                              deliveryOption: _deliveryOption,
+                              selectedItems: cartProvider.getSelectedItems(),
+                            ),
+                          );
+                        },
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 20),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.credit_card),
+                      const SizedBox(width: 12),
+                      Text(
+                        'Proceed to Checkout',
+                        style: TextStyle(
+                          fontSize: ResponsiveHelper.getResponsiveFontSize(
+                            context,
+                            16,
+                            maxSize: 18,
+                          ),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
         ),
@@ -267,6 +342,28 @@ class _CartScreenState extends State<CartScreen> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Checkbox
+            SizedBox(
+              width: 40,
+              child: Center(
+                child: Checkbox(
+                  value: item.isSelected ?? true,
+                  onChanged: (_) {
+                    cartProvider.toggleItemSelection(item.product.id);
+                  },
+                  activeColor: AppTheme.primary,
+                ),
+              ),
+            ),
+            SizedBox(
+              width: ResponsiveHelper.getResponsiveSpacing(
+                context,
+                small: 8,
+                medium: 10,
+                large: 12,
+              ),
+            ),
+
             // Image
             ClipRRect(
               borderRadius: BorderRadius.circular(AppTheme.radiusLg),
@@ -292,32 +389,33 @@ class _CartScreenState extends State<CartScreen> {
               ),
             ),
 
-            // Details
+            // Details and Price
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
                     item.product.name,
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       fontSize: ResponsiveHelper.getResponsiveFontSize(
                         context,
-                        16,
-                        maxSize: 18,
+                        14,
+                        maxSize: 16,
                       ),
                     ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
                   Text(
                     '₱${item.product.price.toStringAsFixed(2)}',
                     style: TextStyle(
                       color: AppTheme.primary,
                       fontSize: ResponsiveHelper.getResponsiveFontSize(
                         context,
-                        16,
-                        maxSize: 18,
+                        14,
+                        maxSize: 16,
                       ),
                       fontWeight: FontWeight.w600,
                     ),
@@ -328,14 +426,15 @@ class _CartScreenState extends State<CartScreen> {
             SizedBox(
               width: ResponsiveHelper.getResponsiveSpacing(
                 context,
-                small: 12,
-                medium: 14,
-                large: 16,
+                small: 8,
+                medium: 10,
+                large: 12,
               ),
             ),
 
             // Quantity Controls
             Column(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 IconButton(
                   icon: const Icon(Icons.delete_outline, size: 20),
@@ -434,7 +533,7 @@ class _CartScreenState extends State<CartScreen> {
                 large: 16,
               ),
             ),
-            // Delivery option: custom selectable tiles (replaces deprecated RadioListTile)
+            // Delivery option: Home Delivery only
             GestureDetector(
               onTap: () => setState(() => _deliveryOption = 'delivery'),
               child: Container(
@@ -452,7 +551,7 @@ class _CartScreenState extends State<CartScreen> {
                         children: const [
                           Text('Home Delivery'),
                           SizedBox(height: 2),
-                          Text('Same day delivery - ₱5.99'),
+                          Text('Delivery fee - ₱60.00'),
                         ],
                       ),
                     ),

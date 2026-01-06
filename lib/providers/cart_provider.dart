@@ -108,7 +108,53 @@ class CartProvider extends ChangeNotifier {
     return isDelivery ? AppConstants.deliveryFee : 0.0;
   }
 
-  /// Load cart items from Supabase for a logged-in user
+  // Selection methods
+  void toggleItemSelection(String productId) {
+    final itemIndex = _cartItems.indexWhere(
+      (item) => item.product.id == productId,
+    );
+    if (itemIndex != -1) {
+      _cartItems[itemIndex].isSelected = !_cartItems[itemIndex].isSelected;
+      notifyListeners();
+    }
+  }
+
+  void selectAllItems() {
+    for (var item in _cartItems) {
+      item.isSelected = true;
+    }
+    notifyListeners();
+  }
+
+  void deselectAllItems() {
+    for (var item in _cartItems) {
+      item.isSelected = false;
+    }
+    notifyListeners();
+  }
+
+  bool areAllItemsSelected() {
+    if (_cartItems.isEmpty) return false;
+    return _cartItems.every((item) => item.isSelected);
+  }
+
+  int getSelectedItemCount() {
+    return _cartItems.where((item) => item.isSelected).length;
+  }
+
+  double getSelectedSubtotal() {
+    return _cartItems
+        .where((item) => item.isSelected)
+        .fold(
+          0.0,
+          (total, item) => total + (item.product.price * item.quantity),
+        );
+  }
+
+  List<CartItem> getSelectedItems() {
+    return _cartItems.where((item) => item.isSelected).toList();
+  }
+
   Future<void> loadCartFromDatabase(
     String userId,
     List<Product> allProducts,
