@@ -65,12 +65,49 @@ class AdminProvider extends ChangeNotifier {
   void addOrder(Order order) {
     _orders.insert(0, order);
     notifyListeners();
+
+    // Also save to Supabase
+    debugPrint('💾 Attempting to save order to Supabase: ${order.id}');
+    SupabaseService.createOrder(order)
+        .then((_) {
+          debugPrint('✅ Order saved to Supabase successfully');
+        })
+        .catchError((e) {
+          debugPrint('❌ Failed to save order to Supabase: $e');
+          debugPrint('📋 Error details: ${e.toString()}');
+        });
+  }
+
+  void setOrders(List<Order> orders) {
+    _orders
+      ..clear()
+      ..addAll(orders);
+    notifyListeners();
   }
 
   void updateOrderStatus(String orderId, OrderStatus status) {
     final index = _orders.indexWhere((order) => order.id == orderId);
     if (index != -1) {
-      _orders[index] = _orders[index].copyWith(status: status);
+      // If marking as delivered, set the delivery date to now
+      String? deliveryDate = _orders[index].deliveryDate;
+      if (status == OrderStatus.delivered) {
+        deliveryDate = DateTime.now().toIso8601String();
+      }
+
+      _orders[index] = _orders[index].copyWith(
+        status: status,
+        deliveryDate: deliveryDate,
+      );
+
+      // Also update in Supabase
+      SupabaseService.updateOrderStatus(
+        orderId,
+        status.name,
+        deliveryDate: deliveryDate,
+      ).catchError((e) {
+        debugPrint('⚠️ Failed to sync order status to Supabase: $e');
+      });
+
       notifyListeners();
     }
   }
@@ -146,14 +183,6 @@ class AdminProvider extends ChangeNotifier {
     _bouquetColors
       ..clear()
       ..addAll(colors);
-    notifyListeners();
-  }
-
-  /// Replace current orders list with [orders] and notify listeners.
-  void setOrders(List<Order> orders) {
-    _orders
-      ..clear()
-      ..addAll(orders);
     notifyListeners();
   }
 

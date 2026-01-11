@@ -2,6 +2,7 @@
 // These are informational for now; consider updating to the newer API later.
 // ignore_for_file: deprecated_member_use
 
+import 'dart:math';
 import 'package:flutter/foundation.dart' hide Category;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -379,6 +380,41 @@ class SupabaseService {
     }
   }
 
+  /// Update order status in Supabase
+  static Future<void> updateOrderStatus(
+    String orderId,
+    String status, {
+    String? deliveryDate,
+  }) async {
+    try {
+      // Get current user for debugging
+      final currentUser = _client.auth.currentUser;
+      debugPrint('👤 Current user ID: ${currentUser?.id}');
+      debugPrint(
+        '📝 Attempting to update order $orderId to status=$status, deliveryDate=$deliveryDate',
+      );
+
+      final updateData = {
+        'status': status,
+        if (deliveryDate != null) 'delivery_date': deliveryDate,
+      };
+
+      final response = await _client
+          .from('orders')
+          .update(updateData)
+          .eq('id', orderId);
+
+      debugPrint(
+        '✅ Order $orderId successfully updated to $status in Supabase',
+      );
+      debugPrint('Response: $response');
+    } catch (e) {
+      debugPrint('❌ Error updating order status: $e');
+      debugPrint('Error type: ${e.runtimeType}');
+      throw Exception('Failed to update order status: $e');
+    }
+  }
+
   // Orders for a user
   static Future<List<Map<String, dynamic>>> getOrdersForUser(
     String userId,
@@ -618,13 +654,13 @@ class SupabaseService {
 
   // User Orders
   static Future<List<Map<String, dynamic>>> fetchUserOrders(
-    String userEmail,
+    String userId,
   ) async {
     try {
       final res = await _client
           .from('orders')
           .select()
-          .eq('customer_email', userEmail)
+          .eq('user_id', userId)
           .order('created_at', ascending: false)
           .execute();
 
@@ -633,5 +669,125 @@ class SupabaseService {
     } catch (e) {
       throw Exception('Failed to fetch user orders: $e');
     }
+  }
+
+  // Get order items with product details
+  static Future<List<Map<String, dynamic>>> getOrderItems(
+    String orderId,
+  ) async {
+    try {
+      final res = await _client
+          .from('order_items')
+          .select('id, order_id, product_id, quantity, price')
+          .eq('order_id', orderId)
+          .execute();
+
+      final items = res.data as List? ?? [];
+
+      // Fetch product details for each item
+      List<Map<String, dynamic>> itemsWithProducts = [];
+      for (var item in items) {
+        final productRes = await _client
+            .from('products')
+            .select('id, name, price, image')
+            .eq('id', item['product_id'])
+            .maybeSingle()
+            .execute();
+
+        final product = productRes.data as Map<String, dynamic>?;
+        final itemWithProduct = {
+          ...item as Map<String, dynamic>,
+          'name': product?['name'] ?? 'Unknown Product',
+          'image': product?['image'],
+        };
+        itemsWithProducts.add(itemWithProduct);
+      }
+
+      return itemsWithProducts;
+    } catch (e) {
+      debugPrint('Error fetching order items: $e');
+      return [];
+    }
+  }
+
+  // Create order in Supabase
+  static Future<void> createOrder(Order order) async {
+    try {
+      debugPrint('📝 Creating order in Supabase: ${order.id}');
+
+      // Get current user from Supabase Auth
+      final currentUser = _client.auth.currentUser;
+      final userId = currentUser?.id ?? 'guest';
+
+      debugPrint('👤 Current auth user ID: $userId');
+
+      // Generate a proper UUID for the order (replace the ORD-timestamp with UUID)
+      final orderId = _generateUUID();
+
+      // Insert order - only include fields that exist in the orders table
+      final orderData = {
+        'id': orderId,
+        'order_number': _generateOrderNumber(),
+        'user_id': userId,
+        'phone': order.customerPhone,
+        'delivery_address': order.customerAddress,
+        'total_amount': order.total.toInt(),
+        'status': order.status.name,
+        'date': order.orderDate,
+        'delivery_date': order.deliveryDate,
+        'delivery_option': order.deliveryType.name,
+        'created_at': DateTime.now().toIso8601String(),
+      };
+
+      debugPrint('📊 Order data: $orderData');
+
+      final response = await _client.from('orders').insert(orderData);
+      debugPrint('✅ Order inserted. Response: $response');
+
+      // Insert order items
+      for (var item in order.items) {
+        final itemData = {
+          'order_id': orderId,
+          'product_id': item.product.id,
+          'quantity': item.quantity,
+          'price': (item.product.price as num).toInt(),
+        };
+        debugPrint('📦 Inserting order item: $itemData');
+        await _client.from('order_items').insert(itemData);
+      }
+
+      debugPrint('✅ Order $orderId created successfully in Supabase');
+    } catch (e) {
+      debugPrint('❌ Error creating order in Supabase: $e');
+      debugPrint('Error type: ${e.runtimeType}');
+      rethrow;
+    }
+  }
+
+  // Generate UUID v4
+  static String _generateUUID() {
+    final random = Random.secure();
+    final values = List<int>.generate(16, (i) => random.nextInt(256));
+
+    values[6] = (values[6] & 0x0f) | 0x40;
+    values[8] = (values[8] & 0x3f) | 0x80;
+
+    String toHex(int value) => value.toRadixString(16).padLeft(2, '0');
+
+    return '${toHex(values[0])}${toHex(values[1])}'
+        '${toHex(values[2])}${toHex(values[3])}'
+        '-${toHex(values[4])}${toHex(values[5])}'
+        '-${toHex(values[6])}${toHex(values[7])}'
+        '-${toHex(values[8])}${toHex(values[9])}'
+        '-${toHex(values[10])}${toHex(values[11])}'
+        '${toHex(values[12])}${toHex(values[13])}'
+        '${toHex(values[14])}${toHex(values[15])}';
+  }
+
+  // Generate order number
+  static String _generateOrderNumber() {
+    final now = DateTime.now();
+    final timestamp = now.millisecondsSinceEpoch;
+    return 'ORD-${timestamp.toString().substring(timestamp.toString().length - 6)}';
   }
 }

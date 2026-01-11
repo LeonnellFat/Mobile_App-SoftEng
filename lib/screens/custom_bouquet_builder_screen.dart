@@ -28,9 +28,15 @@ class _CustomBouquetBuilderScreenState
     final cartProvider = context.watch<CartProvider>();
     final adminProvider = context.watch<AdminProvider>();
     final authProvider = context.watch<AuthProvider>();
+    final screenSize = MediaQuery.of(context).size;
+    final isTablet = screenSize.width >= 768;
+    final isLargeScreen = screenSize.width >= 1024;
 
     final totalStems = _calculateTotalStems();
-    final sizeInfo = _getBouquetSizeAndPrice(totalStems);
+    final sizeInfo = _getBouquetSizeAndPrice(_selectedSize);
+
+    // Responsive padding
+    final horizontalPadding = isLargeScreen ? 32.0 : (isTablet ? 24.0 : 16.0);
 
     return Scaffold(
       body: Container(
@@ -48,7 +54,12 @@ class _CustomBouquetBuilderScreenState
               child: SafeArea(
                 bottom: false,
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
+                  padding: EdgeInsets.fromLTRB(
+                    horizontalPadding,
+                    24,
+                    horizontalPadding,
+                    16,
+                  ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -73,10 +84,10 @@ class _CustomBouquetBuilderScreenState
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text(
+                                Text(
                                   'Build Your Custom Bouquet',
                                   style: TextStyle(
-                                    fontSize: 24,
+                                    fontSize: isLargeScreen ? 28 : 24,
                                     fontWeight: FontWeight.w700,
                                     color: AppTheme.primary,
                                   ),
@@ -84,7 +95,7 @@ class _CustomBouquetBuilderScreenState
                                 Text(
                                   'Create a personalized arrangement',
                                   style: TextStyle(
-                                    fontSize: 12,
+                                    fontSize: isTablet ? 13 : 12,
                                     color: AppTheme.mutedForeground,
                                   ),
                                 ),
@@ -102,32 +113,39 @@ class _CustomBouquetBuilderScreenState
             // Content - Step-based UI
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Step 0: Choose Size (always visible)
-                    _buildSizeSelection(),
-                    const SizedBox(height: 24),
+                padding: EdgeInsets.all(horizontalPadding),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxWidth: isLargeScreen ? 1200 : 900,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Step 0: Choose Size (always visible)
+                        _buildSizeSelection(isTablet),
+                        SizedBox(height: isTablet ? 32 : 24),
 
-                    // Step 1: Choose Color Theme (appears after size selected)
-                    if (_selectedSize != null) ...[
-                      _buildColorThemeSelection(adminProvider),
-                      const SizedBox(height: 24),
-                    ],
+                        // Step 1: Choose Color Theme (appears after size selected)
+                        if (_selectedSize != null) ...[
+                          _buildColorThemeSelection(adminProvider, isTablet),
+                          SizedBox(height: isTablet ? 32 : 24),
+                        ],
 
-                    // Step 2: Choose Flowers (appears after color selected)
-                    if (_selectedColorId != null) ...[
-                      _buildFlowerSelection(adminProvider),
-                      const SizedBox(height: 24),
-                    ],
+                        // Step 2: Choose Flowers (appears after color selected)
+                        if (_selectedColorId != null) ...[
+                          _buildFlowerSelection(adminProvider, isTablet),
+                          SizedBox(height: isTablet ? 32 : 24),
+                        ],
 
-                    // Selected Stems Summary (appears after color selection)
-                    if (_selectedColorId != null) ...[
-                      const SizedBox(height: 24),
-                      _buildBouquetSummary(totalStems, sizeInfo),
-                    ],
-                  ],
+                        // Selected Stems Summary (appears after color selection)
+                        if (_selectedColorId != null) ...[
+                          SizedBox(height: isTablet ? 32 : 24),
+                          _buildBouquetSummary(totalStems, sizeInfo, isTablet),
+                        ],
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -144,28 +162,38 @@ class _CustomBouquetBuilderScreenState
                 child: SafeArea(
                   top: false,
                   child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed:
-                            (_canAddToCart(totalStems) &&
-                                _selectedColorId != null &&
-                                _flowerQuantities.isNotEmpty)
-                            ? () => _addCustomBouquetToCart(
-                                authProvider,
-                                cartProvider,
-                                adminProvider,
-                                sizeInfo,
-                              )
-                            : null,
-                        child: const Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.shopping_cart),
-                            SizedBox(width: 8),
-                            Text('Add to Cart'),
-                          ],
+                    padding: EdgeInsets.all(horizontalPadding),
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 500),
+                        child: SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed:
+                                (_canAddToCart(totalStems) &&
+                                    _selectedColorId != null &&
+                                    _flowerQuantities.isNotEmpty)
+                                ? () => _addCustomBouquetToCart(
+                                    authProvider,
+                                    cartProvider,
+                                    adminProvider,
+                                    sizeInfo,
+                                  )
+                                : null,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(Icons.shopping_cart),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Add to Cart',
+                                  style: TextStyle(
+                                    fontSize: isTablet ? 16 : 14,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
                     ),
@@ -178,32 +206,35 @@ class _CustomBouquetBuilderScreenState
     );
   }
 
-  Widget _buildSizeSelection() {
+  Widget _buildSizeSelection(bool isTablet) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Row(
+        Row(
           children: [
-            Text('💐', style: TextStyle(fontSize: 24)),
-            SizedBox(width: 12),
+            Text('💐', style: TextStyle(fontSize: isTablet ? 28 : 24)),
+            SizedBox(width: isTablet ? 16 : 12),
             Text(
               'Choose Your Bouquet Size',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+              style: TextStyle(
+                fontSize: isTablet ? 20 : 18,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ],
         ),
-        const SizedBox(height: 20),
+        SizedBox(height: isTablet ? 24 : 20),
         LayoutBuilder(
           builder: (context, constraints) {
             final width = constraints.maxWidth;
             final int columns = width >= 900 ? 3 : (width >= 600 ? 2 : 1);
-            // Give cards more vertical space to avoid overflow on small devices
-            final childAspect = width >= 900 ? 3.0 : (width >= 600 ? 2.6 : 2.6);
+            // Balanced aspect ratio to fit content without being too tall
+            final childAspect = width >= 900 ? 2.6 : (width >= 600 ? 2.3 : 2.1);
 
             return GridView.count(
               crossAxisCount: columns,
-              crossAxisSpacing: 12,
-              mainAxisSpacing: 12,
+              crossAxisSpacing: isTablet ? 16 : 12,
+              mainAxisSpacing: isTablet ? 16 : 12,
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               childAspectRatio: childAspect,
@@ -211,7 +242,7 @@ class _CustomBouquetBuilderScreenState
                 BouquetSizeCard(
                   title: 'Small',
                   subtitle: 'Perfect intimate gesture with 1-2 flowers',
-                  price: 25.99,
+                  price: 300,
                   pillLabel: '1-2 flowers',
                   selected: _selectedSize == 'Small',
                   onTap: () => setState(() {
@@ -224,7 +255,7 @@ class _CustomBouquetBuilderScreenState
                 BouquetSizeCard(
                   title: 'Medium',
                   subtitle: 'Beautiful arrangement with 6 flowers',
-                  price: 45.99,
+                  price: 600,
                   pillLabel: '6 flowers',
                   selected: _selectedSize == 'Medium',
                   onTap: () => setState(() {
@@ -237,7 +268,7 @@ class _CustomBouquetBuilderScreenState
                 BouquetSizeCard(
                   title: 'Large',
                   subtitle: 'Stunning display with 12 flowers',
-                  price: 85.99,
+                  price: 1200,
                   pillLabel: '12 flowers',
                   selected: _selectedSize == 'Large',
                   onTap: () => setState(() {
@@ -257,32 +288,32 @@ class _CustomBouquetBuilderScreenState
 
   // Old _buildSizeCard removed in favor of `BouquetSizeCard` widget
 
-  Widget _buildColorThemeSelection(AdminProvider adminProvider) {
+  Widget _buildColorThemeSelection(AdminProvider adminProvider, bool isTablet) {
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: EdgeInsets.all(isTablet ? 24 : 20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                const Text('🎨', style: TextStyle(fontSize: 24)),
-                const SizedBox(width: 12),
+                Text('🎨', style: TextStyle(fontSize: isTablet ? 28 : 24)),
+                SizedBox(width: isTablet ? 16 : 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'Choose Bouquet Color Theme',
                         style: TextStyle(
-                          fontSize: 18,
+                          fontSize: isTablet ? 20 : 18,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
                       Text(
                         'From: bouquet_colors',
                         style: TextStyle(
-                          fontSize: 12,
+                          fontSize: isTablet ? 13 : 12,
                           color: AppTheme.mutedForeground,
                         ),
                       ),
@@ -291,14 +322,14 @@ class _CustomBouquetBuilderScreenState
                 ),
               ],
             ),
-            const SizedBox(height: 20),
+            SizedBox(height: isTablet ? 24 : 20),
             // Small debug/status row to help diagnose visibility issues
             Padding(
               padding: const EdgeInsets.only(bottom: 8.0),
               child: Text(
                 'Selected size: ${_selectedSize ?? 'none'} — colors: ${adminProvider.bouquetColors.length}',
-                style: const TextStyle(
-                  fontSize: 12,
+                style: TextStyle(
+                  fontSize: isTablet ? 13 : 12,
                   color: AppTheme.mutedForeground,
                 ),
               ),
@@ -314,97 +345,111 @@ class _CustomBouquetBuilderScreenState
                 ),
               )
             else
-              GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  crossAxisSpacing: 12,
-                  mainAxisSpacing: 12,
-                  childAspectRatio: 2.5,
-                ),
-                itemCount: adminProvider.bouquetColors.length,
-                itemBuilder: (context, index) {
-                  try {
-                    final color = adminProvider.bouquetColors[index];
-                    final isSelected = _selectedColorId == color.id;
-                    final hexColor = color.hexCode != null
-                        ? int.tryParse(color.hexCode!.replaceFirst('#', '0xff'))
-                        : null;
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final width = constraints.maxWidth;
+                  final crossAxisCount = width >= 900
+                      ? 4
+                      : (width >= 600 ? 3 : 2);
 
-                    return GestureDetector(
-                      onTap: () => setState(() => _selectedColorId = color.id),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(12),
-                          // keep border width constant to avoid layout shifts
-                          border: Border.all(
-                            color: isSelected
-                                ? AppTheme.primary
-                                : const Color(0xFFE5E7EB),
-                            width: 1.0,
-                          ),
-                          boxShadow: isSelected
-                              ? [
-                                  BoxShadow(
-                                    color: AppTheme.primary.withAlpha(30),
-                                    blurRadius: 8,
-                                    offset: const Offset(0, 4),
-                                  ),
-                                ]
-                              : null,
-                        ),
-                        child: Container(
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(12),
-                            color: hexColor != null
-                                ? Color(hexColor)
-                                : Colors.grey[300],
-                          ),
-                          child: Center(
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8.0,
+                  return GridView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: crossAxisCount,
+                      crossAxisSpacing: isTablet ? 16 : 12,
+                      mainAxisSpacing: isTablet ? 16 : 12,
+                      childAspectRatio: 2.2,
+                    ),
+                    itemCount: adminProvider.bouquetColors.length,
+                    itemBuilder: (context, index) {
+                      try {
+                        final color = adminProvider.bouquetColors[index];
+                        final isSelected = _selectedColorId == color.id;
+                        final hexColor = color.hexCode != null
+                            ? int.tryParse(
+                                color.hexCode!.replaceFirst('#', '0xff'),
+                              )
+                            : null;
+
+                        return GestureDetector(
+                          onTap: () =>
+                              setState(() => _selectedColorId = color.id),
+                          child: Container(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(12),
+                              // keep border width constant to avoid layout shifts
+                              border: Border.all(
+                                color: isSelected
+                                    ? AppTheme.primary
+                                    : const Color(0xFFE5E7EB),
+                                width: 1.0,
                               ),
-                              child: Text(
-                                color.name,
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
-                                  // choose readable text color based on background luminance
-                                  color: hexColor != null
-                                      ? (Color(hexColor).computeLuminance() >
-                                                0.6
-                                            ? Colors.black
-                                            : Colors.white)
-                                      : Colors.white,
-                                  shadows: [
-                                    Shadow(
-                                      blurRadius: 2,
-                                      color: Colors.black.withAlpha(90),
+                              boxShadow: isSelected
+                                  ? [
+                                      BoxShadow(
+                                        color: AppTheme.primary.withAlpha(30),
+                                        blurRadius: 8,
+                                        offset: const Offset(0, 4),
+                                      ),
+                                    ]
+                                  : null,
+                            ),
+                            child: Container(
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(12),
+                                color: hexColor != null
+                                    ? Color(hexColor)
+                                    : Colors.grey[300],
+                              ),
+                              child: Center(
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8.0,
+                                  ),
+                                  child: Text(
+                                    color.name,
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontSize: isTablet ? 15 : 14,
+                                      fontWeight: FontWeight.bold,
+                                      // choose readable text color based on background luminance
+                                      color: hexColor != null
+                                          ? (Color(
+                                                      hexColor,
+                                                    ).computeLuminance() >
+                                                    0.6
+                                                ? Colors.black
+                                                : Colors.white)
+                                          : Colors.white,
+                                      shadows: [
+                                        Shadow(
+                                          blurRadius: 2,
+                                          color: Colors.black.withAlpha(90),
+                                        ),
+                                      ],
                                     ),
-                                  ],
+                                  ),
                                 ),
                               ),
                             ),
                           ),
-                        ),
-                      ),
-                    );
-                  } catch (e, st) {
-                    debugPrint('Error building color tile: $e\n$st');
-                    return Container(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.redAccent),
-                        color: Colors.red[100],
-                      ),
-                      child: const Center(
-                        child: Icon(Icons.error_outline, color: Colors.red),
-                      ),
-                    );
-                  }
+                        );
+                      } catch (e, st) {
+                        debugPrint('Error building color tile: $e\n$st');
+                        return Container(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.redAccent),
+                            color: Colors.red[100],
+                          ),
+                          child: const Center(
+                            child: Icon(Icons.error_outline, color: Colors.red),
+                          ),
+                        );
+                      }
+                    },
+                  );
                 },
               ),
           ],
@@ -413,32 +458,32 @@ class _CustomBouquetBuilderScreenState
     );
   }
 
-  Widget _buildFlowerSelection(AdminProvider adminProvider) {
+  Widget _buildFlowerSelection(AdminProvider adminProvider, bool isTablet) {
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: EdgeInsets.all(isTablet ? 24 : 20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                const Text('🌺', style: TextStyle(fontSize: 24)),
-                const SizedBox(width: 12),
+                Text('🌺', style: TextStyle(fontSize: isTablet ? 28 : 24)),
+                SizedBox(width: isTablet ? 16 : 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'Add Flower Stems',
                         style: TextStyle(
-                          fontSize: 18,
+                          fontSize: isTablet ? 20 : 18,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
                       Text(
                         'From: flowerTypes',
                         style: TextStyle(
-                          fontSize: 12,
+                          fontSize: isTablet ? 13 : 12,
                           color: AppTheme.mutedForeground,
                         ),
                       ),
@@ -447,7 +492,7 @@ class _CustomBouquetBuilderScreenState
                 ),
               ],
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: isTablet ? 20 : 16),
             if (adminProvider.flowers.isEmpty)
               const Center(
                 child: Padding(
@@ -468,7 +513,7 @@ class _CustomBouquetBuilderScreenState
               Column(
                 children: [
                   ...adminProvider.flowers.map((flower) {
-                    return _buildFlowerSelector(flower);
+                    return _buildFlowerSelector(flower, isTablet);
                   }),
                 ],
               ),
@@ -478,26 +523,26 @@ class _CustomBouquetBuilderScreenState
     );
   }
 
-  Widget _buildFlowerSelector(dynamic flower) {
+  Widget _buildFlowerSelector(dynamic flower, bool isTablet) {
     final flowerId = flower.id;
     final flowerName = flower.name;
     final flowerImage = flower.image;
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+      padding: EdgeInsets.only(bottom: isTablet ? 20 : 16),
       child: Container(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: const Color(0xFFE5E7EB)),
         ),
         child: Padding(
-          padding: const EdgeInsets.all(12),
+          padding: EdgeInsets.all(isTablet ? 16 : 12),
           child: Row(
             children: [
               // Flower Image
               Container(
-                width: 60,
-                height: 60,
+                width: isTablet ? 80 : 60,
+                height: isTablet ? 80 : 60,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(8),
                   image: DecorationImage(
@@ -506,7 +551,7 @@ class _CustomBouquetBuilderScreenState
                   ),
                 ),
               ),
-              const SizedBox(width: 12),
+              SizedBox(width: isTablet ? 16 : 12),
 
               // Flower Name & Quantity
               Expanded(
@@ -515,8 +560,8 @@ class _CustomBouquetBuilderScreenState
                   children: [
                     Text(
                       flowerName,
-                      style: const TextStyle(
-                        fontSize: 16,
+                      style: TextStyle(
+                        fontSize: isTablet ? 18 : 16,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -526,8 +571,8 @@ class _CustomBouquetBuilderScreenState
                               .fold(0, (a, b) => a + b)
                               .toString() ??
                           '0 stems',
-                      style: const TextStyle(
-                        fontSize: 12,
+                      style: TextStyle(
+                        fontSize: isTablet ? 13 : 12,
                         color: AppTheme.mutedForeground,
                       ),
                     ),
@@ -545,7 +590,7 @@ class _CustomBouquetBuilderScreenState
                   children: [
                     IconButton(
                       icon: const Icon(Icons.remove),
-                      iconSize: 16,
+                      iconSize: isTablet ? 20 : 16,
                       onPressed: () => _updateFlowerQuantity(flowerId, -1),
                     ),
                     Text(
@@ -555,11 +600,14 @@ class _CustomBouquetBuilderScreenState
                               ) ??
                               0)
                           .toString(),
-                      style: const TextStyle(fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: isTablet ? 16 : 14,
+                      ),
                     ),
                     IconButton(
                       icon: const Icon(Icons.add),
-                      iconSize: 16,
+                      iconSize: isTablet ? 20 : 16,
                       onPressed: () => _updateFlowerQuantity(flowerId, 1),
                     ),
                   ],
@@ -572,44 +620,60 @@ class _CustomBouquetBuilderScreenState
     );
   }
 
-  Widget _buildBouquetSummary(int totalStems, Map<String, dynamic> sizeInfo) {
+  Widget _buildBouquetSummary(
+    int totalStems,
+    Map<String, dynamic> sizeInfo,
+    bool isTablet,
+  ) {
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: EdgeInsets.all(isTablet ? 24 : 20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Row(
+            Row(
               children: [
-                Text('📋', style: TextStyle(fontSize: 24)),
-                SizedBox(width: 12),
+                Text('📋', style: TextStyle(fontSize: isTablet ? 28 : 24)),
+                SizedBox(width: isTablet ? 16 : 12),
                 Text(
                   'Bouquet Summary',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                  style: TextStyle(
+                    fontSize: isTablet ? 20 : 18,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ],
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: isTablet ? 20 : 16),
             _buildSummaryRow(
               'Color Theme:',
               _selectedColorId ?? 'Not selected',
+              isTablet,
             ),
-            _buildSummaryRow('Total stems:', totalStems.toString()),
-            _buildSummaryRow('Bouquet size:', sizeInfo['size'] as String),
+            _buildSummaryRow('Total stems:', totalStems.toString(), isTablet),
+            _buildSummaryRow(
+              'Bouquet size:',
+              sizeInfo['size'] as String,
+              isTablet,
+            ),
             _buildSummaryRow(
               'Price:',
               '₱${(sizeInfo['price'] as double).toStringAsFixed(0)}',
+              isTablet,
               isPrice: true,
             ),
             const SizedBox(height: 8),
-            const Text(
+            Text(
               'Professional arrangement: Included',
-              style: TextStyle(fontSize: 12, color: AppTheme.mutedForeground),
+              style: TextStyle(
+                fontSize: isTablet ? 13 : 12,
+                color: AppTheme.mutedForeground,
+              ),
             ),
             if (totalStems < AppConstants.minStemsForCustomBouquet)
               Container(
-                margin: const EdgeInsets.only(top: 16),
-                padding: const EdgeInsets.all(12),
+                margin: EdgeInsets.only(top: isTablet ? 20 : 16),
+                padding: EdgeInsets.all(isTablet ? 16 : 12),
                 decoration: BoxDecoration(
                   color: Colors.amber[50],
                   border: Border.all(color: Colors.amber[200]!),
@@ -622,7 +686,7 @@ class _CustomBouquetBuilderScreenState
                       child: Text(
                         'Minimum ${AppConstants.minStemsForCustomBouquet} stems required. Add ${AppConstants.minStemsForCustomBouquet - totalStems} more stem${(AppConstants.minStemsForCustomBouquet - totalStems) != 1 ? 's' : ''} to complete your bouquet.',
                         style: TextStyle(
-                          fontSize: 12,
+                          fontSize: isTablet ? 13 : 12,
                           color: Colors.amber[900],
                         ),
                       ),
@@ -636,21 +700,26 @@ class _CustomBouquetBuilderScreenState
     );
   }
 
-  Widget _buildSummaryRow(String label, String value, {bool isPrice = false}) {
+  Widget _buildSummaryRow(
+    String label,
+    String value,
+    bool isTablet, {
+    bool isPrice = false,
+  }) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: EdgeInsets.symmetric(vertical: isTablet ? 10 : 8),
       child: Row(
         children: [
           Expanded(
             child: Text(
               label,
-              style: const TextStyle(
-                fontSize: 14,
+              style: TextStyle(
+                fontSize: isTablet ? 15 : 14,
                 color: AppTheme.mutedForeground,
               ),
             ),
           ),
-          const SizedBox(width: 12),
+          SizedBox(width: isTablet ? 16 : 12),
           Flexible(
             child: Text(
               value,
@@ -658,7 +727,7 @@ class _CustomBouquetBuilderScreenState
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.right,
               style: TextStyle(
-                fontSize: 14,
+                fontSize: isTablet ? 15 : 14,
                 fontWeight: isPrice ? FontWeight.bold : FontWeight.normal,
                 color: isPrice ? AppTheme.primary : Colors.black,
               ),
@@ -712,15 +781,16 @@ class _CustomBouquetBuilderScreenState
     });
   }
 
-  Map<String, dynamic> _getBouquetSizeAndPrice(int totalStems) {
-    if (totalStems < 5) {
-      return {'size': 'Custom', 'price': 0.0};
-    } else if (totalStems < 15) {
-      return {'size': 'Small', 'price': 250.0};
-    } else if (totalStems < 25) {
-      return {'size': 'Medium', 'price': 600.0};
-    } else {
-      return {'size': 'Large', 'price': 1200.0};
+  Map<String, dynamic> _getBouquetSizeAndPrice(String? selectedSize) {
+    switch (selectedSize) {
+      case 'Small':
+        return {'size': 'Small', 'price': 300.0};
+      case 'Medium':
+        return {'size': 'Medium', 'price': 600.0};
+      case 'Large':
+        return {'size': 'Large', 'price': 1200.0};
+      default:
+        return {'size': 'Not selected', 'price': 0.0};
     }
   }
 

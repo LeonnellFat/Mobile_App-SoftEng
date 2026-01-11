@@ -672,12 +672,19 @@ class _DriverScreenState extends State<DriverScreen> {
 
   Widget _buildTransactionHistory(List<Order> completedOrders) {
     final today = DateTime.now();
-    final todayDeliveries = completedOrders.where((order) {
-      final orderDate = DateTime.parse(order.orderDate);
-      return orderDate.year == today.year &&
-          orderDate.month == today.month &&
-          orderDate.day == today.day;
-    }).toList();
+    final todayDeliveries =
+        completedOrders.where((order) {
+          // Use deliveryDate if available, otherwise use orderDate
+          final dateToCheck = order.deliveryDate ?? order.orderDate;
+          final checkDate = DateTime.parse(dateToCheck);
+          return checkDate.year == today.year &&
+              checkDate.month == today.month &&
+              checkDate.day == today.day;
+        }).toList()..sort(
+          (a, b) => DateTime.parse(
+            b.deliveryDate ?? b.orderDate,
+          ).compareTo(DateTime.parse(a.deliveryDate ?? a.orderDate)),
+        );
 
     final totalEarnings = todayDeliveries.fold<double>(
       0,
@@ -847,11 +854,14 @@ class _DriverScreenState extends State<DriverScreen> {
                           children: [
                             Row(
                               children: [
-                                Text(
-                                  'Order ${order.id}',
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
+                                Expanded(
+                                  child: Text(
+                                    'Order ${order.orderNumber ?? order.id}',
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
                                 const SizedBox(width: 8),

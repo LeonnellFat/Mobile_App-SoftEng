@@ -968,7 +968,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         decoration: const BoxDecoration(gradient: AppTheme.backgroundGradient),
         child: SafeArea(
           child: FutureBuilder<List<Map<String, dynamic>>>(
-            future: SupabaseService.fetchUserOrders(user.email),
+            future: SupabaseService.fetchUserOrders(user.id),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const Center(child: CircularProgressIndicator());
@@ -1091,12 +1091,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
+                                  // Order Header
                                   Row(
                                     mainAxisAlignment:
                                         MainAxisAlignment.spaceBetween,
                                     children: [
                                       Text(
-                                        'Order #${order['id']?.toString().substring(0, 8) ?? 'N/A'}',
+                                        'Order ${order['order_number'] ?? order['id']?.toString().substring(0, 8) ?? 'N/A'}',
                                         style: const TextStyle(
                                           fontSize: 16,
                                           fontWeight: FontWeight.w600,
@@ -1127,20 +1128,183 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     ],
                                   ),
                                   const SizedBox(height: 12),
-                                  Text(
-                                    'Total: ₱${(order['total'] ?? 0).toStringAsFixed(2)}',
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w500,
+
+                                  // Order Items
+                                  FutureBuilder<List<Map<String, dynamic>>>(
+                                    future: SupabaseService.getOrderItems(
+                                      order['id'],
+                                    ),
+                                    builder: (context, itemSnapshot) {
+                                      if (itemSnapshot.connectionState ==
+                                          ConnectionState.waiting) {
+                                        return const Padding(
+                                          padding: EdgeInsets.symmetric(
+                                            vertical: 8,
+                                          ),
+                                          child: SizedBox(
+                                            height: 40,
+                                            child: CircularProgressIndicator(),
+                                          ),
+                                        );
+                                      }
+
+                                      final items = itemSnapshot.data ?? [];
+                                      return Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          if (items.isEmpty)
+                                            const Text(
+                                              'No items',
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                color: AppTheme.mutedForeground,
+                                              ),
+                                            )
+                                          else
+                                            Container(
+                                              decoration: BoxDecoration(
+                                                color: AppTheme.background,
+                                                borderRadius:
+                                                    BorderRadius.circular(8),
+                                              ),
+                                              padding: const EdgeInsets.all(8),
+                                              child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: items
+                                                    .map<Widget>(
+                                                      (item) => Padding(
+                                                        padding:
+                                                            const EdgeInsets.symmetric(
+                                                              vertical: 4,
+                                                            ),
+                                                        child: Row(
+                                                          mainAxisAlignment:
+                                                              MainAxisAlignment
+                                                                  .spaceBetween,
+                                                          children: [
+                                                            Expanded(
+                                                              child: Text(
+                                                                '${item['name'] ?? 'Product'} x${item['quantity'] ?? 1}',
+                                                                style:
+                                                                    const TextStyle(
+                                                                      fontSize:
+                                                                          12,
+                                                                    ),
+                                                                overflow:
+                                                                    TextOverflow
+                                                                        .ellipsis,
+                                                              ),
+                                                            ),
+                                                            const SizedBox(
+                                                              width: 8,
+                                                            ),
+                                                            Text(
+                                                              '₱${((item['price'] ?? 0) * (item['quantity'] ?? 1)).toStringAsFixed(2)}',
+                                                              style: const TextStyle(
+                                                                fontSize: 12,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .w600,
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                      ),
+                                                    )
+                                                    .toList(),
+                                              ),
+                                            ),
+                                          const SizedBox(height: 12),
+                                        ],
+                                      );
+                                    },
+                                  ),
+
+                                  // Customer and Delivery Info
+                                  Container(
+                                    decoration: BoxDecoration(
+                                      color: AppTheme.background,
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    padding: const EdgeInsets.all(12),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'Delivery to: ${order['delivery_address'] ?? 'N/A'}',
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          'Phone: ${order['phone'] ?? 'N/A'}',
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            color: AppTheme.mutedForeground,
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    'Date: ${DateTime.tryParse(order['order_date'] ?? '')?.toString().split(' ')[0] ?? 'N/A'}',
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      color: AppTheme.mutedForeground,
-                                    ),
+                                  const SizedBox(height: 12),
+
+                                  // Total and Date
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          const Text(
+                                            'Total Amount',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: AppTheme.mutedForeground,
+                                            ),
+                                          ),
+                                          Text(
+                                            '₱${(order['total_amount'] ?? 0).toStringAsFixed(2)}',
+                                            style: const TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.w700,
+                                              color: AppTheme.primary,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.end,
+                                        children: [
+                                          const Text(
+                                            'Order Date',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: AppTheme.mutedForeground,
+                                            ),
+                                          ),
+                                          Text(
+                                            DateTime.tryParse(
+                                                  order['date'] ?? '',
+                                                )?.toString().split(' ')[0] ??
+                                                'N/A',
+                                            style: const TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
                                   ),
                                 ],
                               ),
