@@ -8,6 +8,7 @@ import 'providers/admin_provider.dart';
 import 'services/supabase_service.dart';
 import 'providers/auth_provider.dart';
 import 'providers/cart_provider.dart';
+import 'widgets/app_lifecycle_wrapper.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -72,6 +73,10 @@ Future<void> main() async {
     } catch (e) {
       debugPrint('⚠️ Error loading orders: $e');
     }
+
+    // Initialize real-time listeners for products and categories
+    debugPrint('🔄 Starting real-time listeners...');
+    await adminProvider.initializeRealtimeListeners();
   } catch (e) {
     debugPrint('❌ Failed to load data from Supabase: $e');
   }
@@ -83,7 +88,7 @@ Future<void> main() async {
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => CartProvider()),
       ],
-      child: const MyApp(),
+      child: const AppLifecycleWrapper(child: MyApp()),
     ),
   );
 }

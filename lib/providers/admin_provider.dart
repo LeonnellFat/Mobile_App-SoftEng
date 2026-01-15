@@ -18,6 +18,11 @@ class AdminProvider extends ChangeNotifier {
   final List<cat.Category> _categories = [];
   final Map<String, int> _productCountByCategory = {};
 
+  // Real-time listener subscriptions
+  dynamic _productsSubscription;
+  dynamic _categoriesSubscription;
+  dynamic _ordersSubscription;
+
   List<Order> get orders => List.unmodifiable(_orders);
   List<Product> get products => List.unmodifiable(_products);
   List<FlowerType> get flowers => List.unmodifiable(_flowers);
@@ -28,6 +33,91 @@ class AdminProvider extends ChangeNotifier {
   List<cat.Category> get categories => List.unmodifiable(_categories);
 
   AdminProvider();
+
+  /// Initialize real-time listeners for products, categories, and orders
+  Future<void> initializeRealtimeListeners() async {
+    try {
+      debugPrint('🔄 Initializing real-time listeners...');
+      await SupabaseService.subscribeToProductChanges(_handleProductChange);
+      await SupabaseService.subscribeToCategoryChanges(_handleCategoryChange);
+      await SupabaseService.subscribeToOrderChanges(_handleOrderChange);
+      debugPrint('✅ Real-time listeners initialized successfully');
+    } catch (e) {
+      debugPrint('❌ Failed to initialize real-time listeners: $e');
+    }
+  }
+
+  /// Handle product changes from real-time subscription
+  void _handleProductChange(List<Product> updatedProducts) {
+    setProducts(updatedProducts);
+    debugPrint('🔄 Products updated via real-time listener');
+  }
+
+  /// Handle category changes from real-time subscription
+  void _handleCategoryChange(List<cat.Category> updatedCategories) {
+    setCategories(updatedCategories);
+    debugPrint('🔄 Categories updated via real-time listener');
+  }
+
+  /// Handle order changes from real-time subscription
+  void _handleOrderChange(List<Order> updatedOrders) {
+    setOrders(updatedOrders);
+    debugPrint('🔄 Orders updated via real-time listener');
+  }
+
+  /// Refresh products manually (useful on app resume)
+  Future<void> refreshProducts() async {
+    try {
+      debugPrint('🔄 Refreshing products...');
+      final products = await SupabaseService.fetchProducts();
+      setProducts(products);
+      debugPrint('✅ Products refreshed');
+    } catch (e) {
+      debugPrint('❌ Failed to refresh products: $e');
+    }
+  }
+
+  /// Refresh categories manually (useful on app resume)
+  Future<void> refreshCategories() async {
+    try {
+      debugPrint('🔄 Refreshing categories...');
+      final categories = await SupabaseService.fetchCategories();
+      setCategories(categories);
+      debugPrint('✅ Categories refreshed');
+    } catch (e) {
+      debugPrint('❌ Failed to refresh categories: $e');
+    }
+  }
+
+  /// Refresh orders manually (useful on app resume)
+  Future<void> refreshOrders() async {
+    try {
+      debugPrint('🔄 Refreshing orders...');
+      final orders = await SupabaseService.getOrders();
+      setOrders(orders);
+      debugPrint('✅ Orders refreshed');
+    } catch (e) {
+      debugPrint('❌ Failed to refresh orders: $e');
+    }
+  }
+
+  /// Cancel real-time subscriptions (call on dispose)
+  Future<void> cancelRealtimeListeners() async {
+    try {
+      await SupabaseService.unsubscribeFromProducts(_productsSubscription);
+      await SupabaseService.unsubscribeFromCategories(_categoriesSubscription);
+      await SupabaseService.unsubscribeFromOrders(_ordersSubscription);
+      debugPrint('✅ Real-time listeners cancelled');
+    } catch (e) {
+      debugPrint('⚠️ Error cancelling listeners: $e');
+    }
+  }
+
+  @override
+  void dispose() {
+    cancelRealtimeListeners();
+    super.dispose();
+  }
 
   /// Load products (and optionally other admin data) from Supabase service.
   /// Call this once after Supabase.initialize() to populate the in-memory lists.

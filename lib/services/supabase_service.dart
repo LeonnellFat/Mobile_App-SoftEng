@@ -402,7 +402,8 @@ class SupabaseService {
       final response = await _client
           .from('orders')
           .update(updateData)
-          .eq('id', orderId);
+          .eq('id', orderId)
+          .select();
 
       debugPrint(
         '✅ Order $orderId successfully updated to $status in Supabase',
@@ -789,5 +790,105 @@ class SupabaseService {
     final now = DateTime.now();
     final timestamp = now.millisecondsSinceEpoch;
     return 'ORD-${timestamp.toString().substring(timestamp.toString().length - 6)}';
+  }
+
+  /// Real-time listeners for products and categories
+  static Future<void> subscribeToProductChanges(
+    Function(List<Product>) onDataChanged,
+  ) async {
+    try {
+      _client.channel('products:*').on(
+        RealtimeListenTypes.postgresChanges,
+        ChannelFilter(event: '*', schema: 'public', table: 'products'),
+        (payload, [ref]) {
+          debugPrint('📡 Product change detected: ${payload['eventType']}');
+          fetchProducts()
+              .then((products) {
+                onDataChanged(products);
+              })
+              .catchError((e) {
+                debugPrint('❌ Error handling product change: $e');
+              });
+        },
+      ).subscribe();
+      debugPrint('✅ Subscribed to product changes');
+    } catch (e) {
+      debugPrint('❌ Failed to subscribe to product changes: $e');
+    }
+  }
+
+  static Future<void> subscribeToCategoryChanges(
+    Function(List<Category>) onDataChanged,
+  ) async {
+    try {
+      _client.channel('categories:*').on(
+        RealtimeListenTypes.postgresChanges,
+        ChannelFilter(event: '*', schema: 'public', table: 'categories'),
+        (payload, [ref]) {
+          debugPrint('📡 Category change detected: ${payload['eventType']}');
+          fetchCategories()
+              .then((categories) {
+                onDataChanged(categories);
+              })
+              .catchError((e) {
+                debugPrint('❌ Error handling category change: $e');
+              });
+        },
+      ).subscribe();
+      debugPrint('✅ Subscribed to category changes');
+    } catch (e) {
+      debugPrint('❌ Failed to subscribe to category changes: $e');
+    }
+  }
+
+  static Future<void> unsubscribeFromProducts(dynamic subscription) async {
+    try {
+      await _client.channel('products:*').unsubscribe();
+      debugPrint('✅ Unsubscribed from product changes');
+    } catch (e) {
+      debugPrint('⚠️ Error unsubscribing from products: $e');
+    }
+  }
+
+  static Future<void> unsubscribeFromCategories(dynamic subscription) async {
+    try {
+      await _client.channel('categories:*').unsubscribe();
+      debugPrint('✅ Unsubscribed from category changes');
+    } catch (e) {
+      debugPrint('⚠️ Error unsubscribing from categories: $e');
+    }
+  }
+
+  static Future<void> subscribeToOrderChanges(
+    Function(List<Order>) onDataChanged,
+  ) async {
+    try {
+      _client.channel('orders:*').on(
+        RealtimeListenTypes.postgresChanges,
+        ChannelFilter(event: '*', schema: 'public', table: 'orders'),
+        (payload, [ref]) {
+          debugPrint('📡 Order change detected: ${payload['eventType']}');
+          getOrders()
+              .then((orders) {
+                onDataChanged(orders);
+              })
+              .catchError((e) {
+                debugPrint('❌ Error handling order change: $e');
+              });
+        },
+      ).subscribe();
+      debugPrint('✅ Subscribed to order changes');
+    } catch (e) {
+      debugPrint('❌ Failed to subscribe to order changes: $e');
+    }
+  }
+
+  static Future<void> unsubscribeFromOrders(dynamic subscription) async {
+    try {
+      await _client.channel('orders:*').unsubscribe();
+      debugPrint('✅ Unsubscribed from order changes');
+    } catch (e) {
+      debugPrint('⚠️ Error unsubscribing from orders: $e');
+    }
   }
 }

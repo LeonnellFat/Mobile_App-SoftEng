@@ -75,10 +75,7 @@ class Order {
           [],
       total:
           ((json['total_amount'] ?? json['total']) as num?)?.toDouble() ?? 0.0,
-      status: OrderStatus.values.firstWhere(
-        (e) => e.name == (json['status'] as String?)?.toLowerCase(),
-        orElse: () => OrderStatus.pending,
-      ),
+      status: _parseOrderStatus(json['status'] as String?),
       orderDate:
           (json['created_at'] ?? json['orderDate']) as String? ??
           DateTime.now().toIso8601String(),
@@ -172,5 +169,34 @@ extension OrderStatusExtension on OrderStatus {
       case OrderStatus.cancelled:
         return 'Cancelled';
     }
+  }
+}
+
+// Helper function to parse order status from string
+OrderStatus _parseOrderStatus(String? statusStr) {
+  if (statusStr == null || statusStr.isEmpty) {
+    return OrderStatus.pending;
+  }
+
+  // Map string values from database to enum
+  switch (statusStr.toLowerCase()) {
+    case 'pending':
+      return OrderStatus.pending;
+    case 'confirmed':
+      return OrderStatus.confirmed;
+    case 'preparing':
+      return OrderStatus.preparing;
+    case 'ready':
+      return OrderStatus.ready;
+    case 'outfordelivery':
+    case 'out_for_delivery':
+    case 'outForDelivery':
+      return OrderStatus.outForDelivery;
+    case 'delivered':
+      return OrderStatus.delivered;
+    case 'cancelled':
+      return OrderStatus.cancelled;
+    default:
+      return OrderStatus.pending;
   }
 }
