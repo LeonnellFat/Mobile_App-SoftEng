@@ -416,7 +416,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
                     Expanded(
                       child: LayoutBuilder(
                         builder: (context, constraints) {
-                          final paginationHeight = totalPages > 1 ? 72.0 : 0.0;
+                          final paginationHeight = totalPages > 1 ? 16.0 : 0.0;
                           final gridHeight =
                               (constraints.maxHeight - paginationHeight).clamp(
                                 0.0,
@@ -506,48 +506,76 @@ class _ProductsScreenState extends State<ProductsScreen> {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        IconButton(
-          icon: const Icon(Icons.chevron_left_outlined),
-          onPressed: _currentPage > 1
-              ? () => setState(
-                  () => _currentPage = (_currentPage - 1).clamp(1, totalPages),
-                )
-              : null,
+        // Previous button
+        SizedBox(
+          width: 32,
+          height: 32,
+          child: IconButton(
+            icon: const Icon(Icons.chevron_left, size: 18),
+            padding: EdgeInsets.zero,
+            onPressed: _currentPage > 1
+                ? () => setState(
+                    () =>
+                        _currentPage = (_currentPage - 1).clamp(1, totalPages),
+                  )
+                : null,
+          ),
         ),
+        const SizedBox(width: 4),
+
+        // Page indicators (compact)
         for (var i = 1; i <= totalPages; i++)
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: OutlinedButton(
-              style: OutlinedButton.styleFrom(
-                minimumSize: const Size(36, 36),
-                padding: EdgeInsets.zero,
-                side: BorderSide(
-                  color: i == _currentPage
-                      ? AppTheme.primary
-                      : Colors.grey.shade200,
+            padding: const EdgeInsets.symmetric(horizontal: 2),
+            child: SizedBox(
+              width: 24,
+              height: 24,
+              child: OutlinedButton(
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(24, 24),
+                  padding: EdgeInsets.zero,
+                  side: BorderSide(
+                    color: i == _currentPage
+                        ? AppTheme.primary
+                        : Colors.grey.shade200,
+                    width: 1,
+                  ),
+                  backgroundColor: i == _currentPage
+                      ? AppTheme.primary.withAlpha((0.08 * 255).round())
+                      : null,
                 ),
-                backgroundColor: i == _currentPage
-                    ? AppTheme.primary.withAlpha((0.08 * 255).round())
-                    : null,
-              ),
-              onPressed: () => setState(() => _currentPage = i),
-              child: Text(
-                '$i',
-                style: TextStyle(
-                  color: i == _currentPage
-                      ? AppTheme.primary
-                      : AppTheme.mutedForeground,
+                onPressed: () => setState(() => _currentPage = i),
+                child: Text(
+                  '$i',
+                  style: TextStyle(
+                    color: i == _currentPage
+                        ? AppTheme.primary
+                        : AppTheme.mutedForeground,
+                    fontSize: 10,
+                    fontWeight: i == _currentPage
+                        ? FontWeight.bold
+                        : FontWeight.normal,
+                  ),
                 ),
               ),
             ),
           ),
-        IconButton(
-          icon: const Icon(Icons.chevron_right_outlined),
-          onPressed: _currentPage < totalPages
-              ? () => setState(
-                  () => _currentPage = (_currentPage + 1).clamp(1, totalPages),
-                )
-              : null,
+        const SizedBox(width: 4),
+
+        // Next button
+        SizedBox(
+          width: 32,
+          height: 32,
+          child: IconButton(
+            icon: const Icon(Icons.chevron_right, size: 18),
+            padding: EdgeInsets.zero,
+            onPressed: _currentPage < totalPages
+                ? () => setState(
+                    () =>
+                        _currentPage = (_currentPage + 1).clamp(1, totalPages),
+                  )
+                : null,
+          ),
         ),
       ],
     );
