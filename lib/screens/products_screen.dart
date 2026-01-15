@@ -351,9 +351,6 @@ class _ProductsScreenState extends State<ProductsScreen> {
                           itemBuilder: (context, i) {
                             final category = categories[i];
                             final isSelected = _selectedFilter == category;
-                            // Disable category switching when viewing a specific category
-                            final isDisabled =
-                                _isCategoryMode && category != 'All';
                             return ChoiceChip(
                               label: Text(
                                 category,
@@ -377,9 +374,8 @@ class _ProductsScreenState extends State<ProductsScreen> {
                               ),
                               showCheckmark: true,
                               checkmarkColor: AppTheme.primary,
-                              onSelected: isDisabled
-                                  ? null
-                                  : (_) => _onCategoryFilterSelected(category),
+                              onSelected: (_) =>
+                                  _onCategoryFilterSelected(category),
                             );
                           },
                         ),

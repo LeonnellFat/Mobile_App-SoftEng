@@ -142,31 +142,31 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Custom Bouquet Builder
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.auto_awesome,
-                          size: 20,
-                          color: AppTheme.primary,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Create Your Own',
-                          style: Theme.of(context).textTheme.titleLarge,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
+                    // Custom Bouquet Builder - HIDDEN
+                    // Row(
+                    //   children: [
+                    //     const Icon(
+                    //       Icons.auto_awesome,
+                    //       size: 20,
+                    //       color: AppTheme.primary,
+                    //     ),
+                    //     const SizedBox(width: 8),
+                    //     Text(
+                    //       'Create Your Own',
+                    //       style: Theme.of(context).textTheme.titleLarge,
+                    //     ),
+                    //   ],
+                    // ),
+                    // const SizedBox(height: 16),
 
-                    _CustomBouquetCard(
-                      onTap: () {
-                        // Navigate to custom bouquet builder
-                        widget.onNavigate?.call('custom_bouquet');
-                      },
-                    ),
+                    // _CustomBouquetCard(
+                    //   onTap: () {
+                    //     // Navigate to custom bouquet builder
+                    //     widget.onNavigate?.call('custom_bouquet');
+                    //   },
+                    // ),
 
-                    const SizedBox(height: 32),
+                    // const SizedBox(height: 32),
 
                     // Categories Header
                     Text(
@@ -575,22 +575,22 @@ class _CategoryCardState extends State<_CategoryCard>
                       ),
                     ),
 
-                    // Icon Badge
-                    Positioned(
-                      top: 12,
-                      left: 12,
-                      child: Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withAlpha((0.95 * 255).round()),
-                          borderRadius: BorderRadius.circular(
-                            AppTheme.radiusLg,
-                          ),
-                          boxShadow: AppTheme.shadowMd,
-                        ),
-                        child: const Text('💐', style: TextStyle(fontSize: 28)),
-                      ),
-                    ),
+                    // Icon Badge - HIDDEN
+                    // Positioned(
+                    //   top: 12,
+                    //   left: 12,
+                    //   child: Container(
+                    //     padding: const EdgeInsets.all(10),
+                    //     decoration: BoxDecoration(
+                    //       color: Colors.white.withAlpha((0.95 * 255).round()),
+                    //       borderRadius: BorderRadius.circular(
+                    //         AppTheme.radiusLg,
+                    //       ),
+                    //       boxShadow: AppTheme.shadowMd,
+                    //     ),
+                    //     child: const Text('💐', style: TextStyle(fontSize: 28)),
+                    //   ),
+                    // ),
 
                     // Count Badge
                     Positioned(
