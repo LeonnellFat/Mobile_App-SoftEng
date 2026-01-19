@@ -416,6 +416,53 @@ class SupabaseService {
     }
   }
 
+  /// Cancel an order (only if status is pending)
+  static Future<void> cancelOrder(String orderId) async {
+    try {
+      final currentUser = _client.auth.currentUser;
+      debugPrint('👤 Current user ID: ${currentUser?.id}');
+      debugPrint('📝 Attempting to cancel order $orderId');
+
+      if (currentUser == null) {
+        throw Exception('User not authenticated');
+      }
+
+      // First, check if the order is in pending status and belongs to the current user
+      final orderCheck = await _client
+          .from('orders')
+          .select('status, user_id')
+          .eq('id', orderId)
+          .eq('user_id', currentUser.id)
+          .maybeSingle();
+
+      final orderData = orderCheck as Map<String, dynamic>?;
+      if (orderData == null) {
+        throw Exception('Order not found or does not belong to you');
+      }
+
+      final currentStatus = orderData['status'] as String?;
+      if ((currentStatus?.toLowerCase()) != 'pending') {
+        throw Exception(
+          'Cannot cancel order. Order status is $currentStatus, only pending orders can be cancelled.',
+        );
+      }
+
+      // Update order status to cancelled
+      final response = await _client
+          .from('orders')
+          .update({'status': 'cancelled'})
+          .eq('id', orderId)
+          .eq('user_id', currentUser.id);
+
+      debugPrint('✅ Order $orderId successfully cancelled in Supabase');
+      debugPrint('Response: $response');
+    } catch (e) {
+      debugPrint('❌ Error cancelling order: $e');
+      debugPrint('Error type: ${e.runtimeType}');
+      throw Exception('Failed to cancel order: $e');
+    }
+  }
+
   // Orders for a user
   static Future<List<Map<String, dynamic>>> getOrdersForUser(
     String userId,
@@ -889,6 +936,47 @@ class SupabaseService {
       debugPrint('✅ Unsubscribed from order changes');
     } catch (e) {
       debugPrint('⚠️ Error unsubscribing from orders: $e');
+    }
+  }
+
+  /// Real-time subscription for user-specific orders
+  static Future<void> subscribeToUserOrderChanges(
+    String userId,
+    Function(List<Map<String, dynamic>>) onDataChanged,
+  ) async {
+    try {
+      _client.channel('user-orders:$userId').on(
+        RealtimeListenTypes.postgresChanges,
+        ChannelFilter(
+          event: '*',
+          schema: 'public',
+          table: 'orders',
+          filter: 'user_id=eq.$userId',
+        ),
+        (payload, [ref]) {
+          debugPrint('📡 User order change detected: ${payload['eventType']}');
+          fetchUserOrders(userId)
+              .then((orders) {
+                onDataChanged(orders);
+              })
+              .catchError((e) {
+                debugPrint('❌ Error handling user order change: $e');
+              });
+        },
+      ).subscribe();
+      debugPrint('✅ Subscribed to user order changes for $userId');
+    } catch (e) {
+      debugPrint('❌ Failed to subscribe to user order changes: $e');
+    }
+  }
+
+  /// Unsubscribe from user-specific order changes
+  static Future<void> unsubscribeFromUserOrders(String userId) async {
+    try {
+      await _client.channel('user-orders:$userId').unsubscribe();
+      debugPrint('✅ Unsubscribed from user order changes for $userId');
+    } catch (e) {
+      debugPrint('⚠️ Error unsubscribing from user orders: $e');
     }
   }
 }

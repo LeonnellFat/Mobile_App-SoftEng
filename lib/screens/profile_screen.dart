@@ -23,6 +23,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _isEditingAddress = false;
   bool _isSaving = false;
 
+  // Real-time order tracking
+  List<Map<String, dynamic>> _userOrders = [];
+  String? _subscribedUserId;
+
   @override
   void initState() {
     super.initState();
@@ -57,6 +61,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void dispose() {
     _phoneController.dispose();
     _addressController.dispose();
+    // Unsubscribe from real-time updates
+    if (_subscribedUserId != null) {
+      SupabaseService.unsubscribeFromUserOrders(_subscribedUserId!);
+    }
     super.dispose();
   }
 
@@ -963,362 +971,483 @@ class _ProfileScreenState extends State<ProfileScreen> {
       );
     }
 
+    // Set up real-time subscription if not already subscribed
+    if (_subscribedUserId != user.id) {
+      _subscribedUserId = user.id;
+      // Initial fetch
+      SupabaseService.fetchUserOrders(user.id).then((orders) {
+        if (mounted) {
+          setState(() {
+            _userOrders = orders;
+          });
+        }
+      });
+      // Set up real-time listener
+      SupabaseService.subscribeToUserOrderChanges(user.id, (updatedOrders) {
+        if (mounted) {
+          setState(() {
+            _userOrders = updatedOrders;
+          });
+        }
+      });
+    }
+
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(gradient: AppTheme.backgroundGradient),
         child: SafeArea(
-          child: FutureBuilder<List<Map<String, dynamic>>>(
-            future: SupabaseService.fetchUserOrders(user.id),
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
-              }
-
-              if (snapshot.hasError) {
-                return Center(child: Text('Error: ${snapshot.error}'));
-              }
-
-              final orders = snapshot.data ?? [];
-
-              return Column(
-                children: [
-                  // Header
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
-                    child: Row(
-                      children: [
-                        GestureDetector(
-                          onTap: () => setState(() => _currentView = 'profile'),
-                          child: Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: Colors.white.withAlpha(
-                                (0.9 * 255).round(),
-                              ),
-                            ),
-                            child: const Icon(
-                              Icons.arrow_back,
-                              color: AppTheme.primary,
+          child: Column(
+            children: [
+              // Header
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
+                child: Row(
+                  children: [
+                    GestureDetector(
+                      onTap: () => setState(() => _currentView = 'profile'),
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.white.withAlpha((0.9 * 255).round()),
+                        ),
+                        child: const Icon(
+                          Icons.arrow_back,
+                          color: AppTheme.primary,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Order History',
+                            style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
+                          Text(
+                            'View your past orders',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppTheme.mutedForeground,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Orders List
+              if (_userOrders.isEmpty)
+                Expanded(
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.shopping_bag_outlined,
+                          size: 64,
+                          color: AppTheme.mutedForeground,
                         ),
-                        const SizedBox(width: 16),
-                        const Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Order History',
-                                style: TextStyle(
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                              Text(
-                                'View your past orders',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: AppTheme.mutedForeground,
-                                ),
-                              ),
-                            ],
+                        const SizedBox(height: 16),
+                        const Text(
+                          'No orders yet',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Start shopping to see your orders here',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: AppTheme.mutedForeground,
                           ),
                         ),
                       ],
                     ),
                   ),
-
-                  // Orders List
-                  if (orders.isEmpty)
-                    Expanded(
-                      child: Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.shopping_bag_outlined,
-                              size: 64,
-                              color: AppTheme.mutedForeground,
-                            ),
-                            const SizedBox(height: 16),
-                            const Text(
-                              'No orders yet',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w600,
+                )
+              else
+                Expanded(
+                  child: ListView.builder(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 16,
+                    ),
+                    itemCount: _userOrders.length,
+                    itemBuilder: (context, index) {
+                      final order = _userOrders[index];
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 16),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withAlpha(
+                                  (0.05 * 255).round(),
+                                ),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
                               ),
-                            ),
-                            const SizedBox(height: 8),
-                            const Text(
-                              'Start shopping to see your orders here',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: AppTheme.mutedForeground,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    )
-                  else
-                    Expanded(
-                      child: ListView.builder(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 24,
-                          vertical: 16,
-                        ),
-                        itemCount: orders.length,
-                        itemBuilder: (context, index) {
-                          final order = orders[index];
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 16),
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(16),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withAlpha(
-                                      (0.05 * 255).round(),
+                            ],
+                          ),
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Order Header
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    'Order ${order['order_number'] ?? order['id']?.toString().substring(0, 8) ?? 'N/A'}',
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
                                     ),
-                                    blurRadius: 10,
-                                    offset: const Offset(0, 4),
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: AppTheme.primary.withAlpha(
+                                        (0.1 * 255).round(),
+                                      ),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Text(
+                                      order['status'] ?? 'Pending',
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        color: AppTheme.primary,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
                                   ),
                                 ],
                               ),
-                              padding: const EdgeInsets.all(16),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  // Order Header
-                                  Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
+                              const SizedBox(height: 12),
+
+                              // Order Items
+                              FutureBuilder<List<Map<String, dynamic>>>(
+                                future: SupabaseService.getOrderItems(
+                                  order['id'],
+                                ),
+                                builder: (context, itemSnapshot) {
+                                  if (itemSnapshot.connectionState ==
+                                      ConnectionState.waiting) {
+                                    return const Padding(
+                                      padding: EdgeInsets.symmetric(
+                                        vertical: 8,
+                                      ),
+                                      child: SizedBox(
+                                        height: 40,
+                                        child: CircularProgressIndicator(),
+                                      ),
+                                    );
+                                  }
+
+                                  final items = itemSnapshot.data ?? [];
+                                  return Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
-                                      Text(
-                                        'Order ${order['order_number'] ?? order['id']?.toString().substring(0, 8) ?? 'N/A'}',
-                                        style: const TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 12,
-                                          vertical: 4,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: AppTheme.primary.withAlpha(
-                                            (0.1 * 255).round(),
-                                          ),
-                                          borderRadius: BorderRadius.circular(
-                                            8,
-                                          ),
-                                        ),
-                                        child: Text(
-                                          order['status'] ?? 'Pending',
-                                          style: const TextStyle(
+                                      if (items.isEmpty)
+                                        const Text(
+                                          'No items',
+                                          style: TextStyle(
                                             fontSize: 12,
-                                            color: AppTheme.primary,
-                                            fontWeight: FontWeight.w600,
+                                            color: AppTheme.mutedForeground,
                                           ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 12),
-
-                                  // Order Items
-                                  FutureBuilder<List<Map<String, dynamic>>>(
-                                    future: SupabaseService.getOrderItems(
-                                      order['id'],
-                                    ),
-                                    builder: (context, itemSnapshot) {
-                                      if (itemSnapshot.connectionState ==
-                                          ConnectionState.waiting) {
-                                        return const Padding(
-                                          padding: EdgeInsets.symmetric(
-                                            vertical: 8,
+                                        )
+                                      else
+                                        Container(
+                                          decoration: BoxDecoration(
+                                            color: AppTheme.background,
+                                            borderRadius: BorderRadius.circular(
+                                              8,
+                                            ),
                                           ),
-                                          child: SizedBox(
-                                            height: 40,
-                                            child: CircularProgressIndicator(),
-                                          ),
-                                        );
-                                      }
-
-                                      final items = itemSnapshot.data ?? [];
-                                      return Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          if (items.isEmpty)
-                                            const Text(
-                                              'No items',
-                                              style: TextStyle(
-                                                fontSize: 12,
-                                                color: AppTheme.mutedForeground,
-                                              ),
-                                            )
-                                          else
-                                            Container(
-                                              decoration: BoxDecoration(
-                                                color: AppTheme.background,
-                                                borderRadius:
-                                                    BorderRadius.circular(8),
-                                              ),
-                                              padding: const EdgeInsets.all(8),
-                                              child: Column(
-                                                crossAxisAlignment:
-                                                    CrossAxisAlignment.start,
-                                                children: items
-                                                    .map<Widget>(
-                                                      (item) => Padding(
-                                                        padding:
-                                                            const EdgeInsets.symmetric(
-                                                              vertical: 4,
-                                                            ),
-                                                        child: Row(
-                                                          mainAxisAlignment:
-                                                              MainAxisAlignment
-                                                                  .spaceBetween,
-                                                          children: [
-                                                            Expanded(
-                                                              child: Text(
-                                                                '${item['name'] ?? 'Product'} x${item['quantity'] ?? 1}',
-                                                                style:
-                                                                    const TextStyle(
-                                                                      fontSize:
-                                                                          12,
-                                                                    ),
-                                                                overflow:
-                                                                    TextOverflow
-                                                                        .ellipsis,
-                                                              ),
-                                                            ),
-                                                            const SizedBox(
-                                                              width: 8,
-                                                            ),
-                                                            Text(
-                                                              '₱${((item['price'] ?? 0) * (item['quantity'] ?? 1)).toStringAsFixed(2)}',
-                                                              style: const TextStyle(
+                                          padding: const EdgeInsets.all(8),
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: items
+                                                .map<Widget>(
+                                                  (item) => Padding(
+                                                    padding:
+                                                        const EdgeInsets.symmetric(
+                                                          vertical: 4,
+                                                        ),
+                                                    child: Row(
+                                                      mainAxisAlignment:
+                                                          MainAxisAlignment
+                                                              .spaceBetween,
+                                                      children: [
+                                                        Expanded(
+                                                          child: Text(
+                                                            '${item['name'] ?? 'Product'} x${item['quantity'] ?? 1}',
+                                                            style:
+                                                                const TextStyle(
+                                                                  fontSize: 12,
+                                                                ),
+                                                            overflow:
+                                                                TextOverflow
+                                                                    .ellipsis,
+                                                          ),
+                                                        ),
+                                                        const SizedBox(
+                                                          width: 8,
+                                                        ),
+                                                        Text(
+                                                          '₱${((item['price'] ?? 0) * (item['quantity'] ?? 1)).toStringAsFixed(2)}',
+                                                          style:
+                                                              const TextStyle(
                                                                 fontSize: 12,
                                                                 fontWeight:
                                                                     FontWeight
                                                                         .w600,
                                                               ),
-                                                            ),
-                                                          ],
                                                         ),
-                                                      ),
-                                                    )
-                                                    .toList(),
-                                              ),
-                                            ),
-                                          const SizedBox(height: 12),
-                                        ],
-                                      );
-                                    },
-                                  ),
-
-                                  // Customer and Delivery Info
-                                  Container(
-                                    decoration: BoxDecoration(
-                                      color: AppTheme.background,
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    padding: const EdgeInsets.all(12),
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          'Delivery to: ${order['delivery_address'] ?? 'N/A'}',
-                                          style: const TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                          maxLines: 2,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          'Phone: ${order['phone'] ?? 'N/A'}',
-                                          style: const TextStyle(
-                                            fontSize: 12,
-                                            color: AppTheme.mutedForeground,
+                                                      ],
+                                                    ),
+                                                  ),
+                                                )
+                                                .toList(),
                                           ),
                                         ),
-                                      ],
-                                    ),
-                                  ),
-                                  const SizedBox(height: 12),
+                                      const SizedBox(height: 12),
+                                    ],
+                                  );
+                                },
+                              ),
 
-                                  // Total and Date
-                                  Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          const Text(
-                                            'Total Amount',
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              color: AppTheme.mutedForeground,
-                                            ),
-                                          ),
-                                          Text(
-                                            '₱${(order['total_amount'] ?? 0).toStringAsFixed(2)}',
-                                            style: const TextStyle(
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.w700,
-                                              color: AppTheme.primary,
-                                            ),
-                                          ),
-                                        ],
+                              // Customer and Delivery Info
+                              Container(
+                                decoration: BoxDecoration(
+                                  color: AppTheme.background,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                padding: const EdgeInsets.all(12),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Delivery to: ${order['delivery_address'] ?? 'N/A'}',
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w500,
                                       ),
-                                      Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.end,
-                                        children: [
-                                          const Text(
-                                            'Order Date',
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              color: AppTheme.mutedForeground,
-                                            ),
-                                          ),
-                                          Text(
-                                            DateTime.tryParse(
-                                                  order['date'] ?? '',
-                                                )?.toString().split(' ')[0] ??
-                                                'N/A',
-                                            style: const TextStyle(
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                          ),
-                                        ],
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'Phone: ${order['phone'] ?? 'N/A'}',
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        color: AppTheme.mutedForeground,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+
+                              // Total and Date
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      const Text(
+                                        'Total Amount',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: AppTheme.mutedForeground,
+                                        ),
+                                      ),
+                                      Text(
+                                        '₱${(order['total_amount'] ?? 0).toStringAsFixed(2)}',
+                                        style: const TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w700,
+                                          color: AppTheme.primary,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.end,
+                                    children: [
+                                      const Text(
+                                        'Order Date',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: AppTheme.mutedForeground,
+                                        ),
+                                      ),
+                                      Text(
+                                        DateTime.tryParse(
+                                              order['date'] ?? '',
+                                            )?.toString().split(' ')[0] ??
+                                            'N/A',
+                                        style: const TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w600,
+                                        ),
                                       ),
                                     ],
                                   ),
                                 ],
                               ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                ],
-              );
-            },
+                              const SizedBox(height: 16),
+
+                              // Cancel button for pending orders
+                              if ((order['status'] as String?)?.toLowerCase() ==
+                                  'pending')
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: ElevatedButton.icon(
+                                    onPressed: () => _showCancelOrderDialog(
+                                      order['id'],
+                                      order['order_number'] ??
+                                          order['id']?.toString().substring(
+                                            0,
+                                            8,
+                                          ) ??
+                                          'N/A',
+                                    ),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.red.withAlpha(
+                                        (0.1 * 255).round(),
+                                      ),
+                                      foregroundColor: Colors.red,
+                                      side: const BorderSide(
+                                        color: Colors.red,
+                                        width: 1.5,
+                                      ),
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 10,
+                                      ),
+                                    ),
+                                    icon: const Icon(Icons.close),
+                                    label: const Text('Cancel Order'),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+            ],
           ),
         ),
       ),
     );
+  }
+
+  /// Show cancel order confirmation dialog
+  Future<void> _showCancelOrderDialog(
+    String orderId,
+    String orderNumber,
+  ) async {
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Cancel Order?'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Are you sure you want to cancel order $orderNumber?',
+                style: const TextStyle(fontSize: 14),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'This action cannot be undone. Only pending orders can be cancelled.',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.orange,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Keep Order'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _cancelOrder(orderId);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Yes, Cancel Order'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  /// Cancel order and update in Supabase
+  Future<void> _cancelOrder(String orderId) async {
+    try {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Cancelling order...'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+
+      await SupabaseService.cancelOrder(orderId);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Order cancelled successfully'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error cancelling order: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    }
   }
 }
